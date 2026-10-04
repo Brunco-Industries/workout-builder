@@ -15,6 +15,7 @@
 <style>
   :root{--bg:#f3f3ef;--card:#fff;--ink:#1c1c1a;--muted:#62665e;--line:#d8d8d1;--accent:#1f5f3f;--accent-ink:#fff;--chip:#e6efe8;--standin:#fff4cc;--standin-ink:#5b4300;--core:#eef3ff;--warn:#b3261e;--warn-bg:#fff0ee;--warn-line:#f1c9c4;--ok-bg:#e8f3ec}
   *{box-sizing:border-box}
+  [hidden]{display:none !important} /* the hidden attribute wins over any display rule below (the update banner is display:flex) */
   html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
   .app{max-width:430px;margin:0 auto;padding:12px 14px calc(24px + env(safe-area-inset-bottom))}
   h1{font-size:1.25rem;margin:6px 0 8px}

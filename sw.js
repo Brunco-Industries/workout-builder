@@ -1,7 +1,7 @@
 /* sw.js — offline cache for Stephen's workout builder.
    Cache-first for the app's own files, refreshed in the background when there is signal.
    CACHE must change with Engine.APP_VERSION (tests.html checks they match) so a new version replaces the old one. */
-const CACHE = 'workout-builder-0.3.2';
+const CACHE = 'workout-builder-0.3.3';
 const REQUIRED = ['./', './index.html', './engine.js', './library.js'];                       // without these there is no app offline
 const OPTIONAL = ['./manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png']; // nice to have; a blocked icon must not stop the install
 
