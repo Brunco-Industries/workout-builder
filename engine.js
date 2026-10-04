@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.3.3'; // Phase 4 fix: the update banner no longer renders while hidden
+  const APP_VERSION = '0.3.4'; // Phase 4 fixes: banner hidden for real; worker precaches fresh bytes past the CDN
   const SPEC_VERSION = '1.3';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
