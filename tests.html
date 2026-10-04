@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workout builder — tests</title>
+<style>
+  body{margin:0;padding:16px;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#f3f3ef;color:#1c1c1a}
+  h1{font-size:1.2rem;margin:0 0 6px}
+  .sum{font-weight:700;padding:8px 10px;border-radius:8px;background:#e8f3ec;display:inline-block;margin:6px 0 12px}
+  .sum.bad{background:#fff0ee;color:#b3261e}
+  table{border-collapse:collapse;width:100%;background:#fff;font-size:.86rem}
+  th,td{border:1px solid #d8d8d1;padding:4px 6px;vertical-align:top;text-align:left}
+  th{background:#eceeea;position:sticky;top:0}
+  td.p{font-weight:700;color:#1f5f3f} td.f{font-weight:700;color:#b3261e} td.n{color:#62665e}
+  textarea{width:100%;height:160px;font:12px/1.3 ui-monospace,Consolas,monospace;margin-top:12px}
+  .hint{color:#62665e;font-size:.86rem}
+</style>
+</head>
+<body>
+<h1>Workout builder — tests</h1>
+<p class="hint">Runs the fixed procedures in <code>engine.js</code> against the embedded library. Fixed "today" values are used so results do not change by the day; the version and run date are recorded per row. Phase 4 case numbers from Stephen's brief are kept as <b>C1–C15</b>; unit checks are <b>U</b>; <b>X</b> is the exhaustive sweep.</p>
+<div id="summary" class="sum">Running…</div>
+<table id="t"><thead><tr><th>#</th><th>Case</th><th>Expected</th><th>Actual</th><th>Pass/fail</th><th>Version</th><th>Date</th></tr></thead><tbody></tbody></table>
+<p class="hint">Markdown copy of the table, for <code>governance/verification-cases.md</code>:</p>
+<textarea id="md" readonly></textarea>
+<script src="engine.js"></script>
+<script src="library.js"></script>
+<script>
+(async function () {
+  'use strict';
+  const E = window.Engine;
+  const RUN_DATE = E.todayIn();
+  const results = [];
+  const rec = (id, name, expected, actual, pass) => results.push({ id, name, expected, actual: String(actual), pass, version: E.APP_VERSION, date: RUN_DATE });
+  async function check(id, name, expected, fn) {
+    try { const r = await fn(); rec(id, name, expected, r.actual, r.pass); }
+    catch (e) { rec(id, name, expected, 'ERROR: ' + (e && e.message || e), false); }
+  }
+  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const throwsRange = fn => { try { fn(); return false; } catch (e) { return e instanceof RangeError; } };
+  const lib = E.parseLibrary(window.EXERCISE_LIBRARY_CSV);
+  const TODAY = '2026-10-06'; // Tuesday
+  const sel = (time, equipment, focus, type, machines) => ({ time, equipment, focus, type, machines: machines || (E.DEFAULT_MACHINES[equipment] || []).slice() });
+  const names = w => [].concat(w.warmup, w.main.items, w.cooldown.stretch, w.cooldown.core.items).map(i => i.name);
+  const row = (date, focus, status, extra) => Object.assign({ date, week_start: E.mondayOf(date), time_selected_min: 30, equipment: 'basic-gym', focus, type: 'strength', status, actual_min: '', note: '' }, extra || {});
+
+  /* ---- unit checks ---- */
+  await check('U1', 'parseCSV handles quoted commas and doubled quotes', '[["a, b","c"],["x \\"y\\"","z"]]', () => {
+    const r = E.parseCSV('"a, b",c\n"x ""y""",z\n'); return { actual: JSON.stringify(r), pass: eq(r, [['a, b', 'c'], ['x "y"', 'z']]) };
+  });
+  await check('U2', 'blockMinutes follows the §3 table', '15→3/9/3/2 · 25→3/19/3/2 · 30→5/20/5/3 · 45→5/35/5/3 · 50→8/34/8/4 · 75→8/59/8/4 · 80→10/60/10/5 · 120→10/100/10/5', () => {
+    const want = { 15: [3, 9, 3, 2], 25: [3, 19, 3, 2], 30: [5, 20, 5, 3], 45: [5, 35, 5, 3], 50: [8, 34, 8, 4], 75: [8, 59, 8, 4], 80: [10, 60, 10, 5], 120: [10, 100, 10, 5] };
+    const got = {}; let ok = true;
+    Object.keys(want).forEach(k => { const b = E.blockMinutes(+k); got[k] = [b.warmup, b.main, b.cooldown, b.minCore]; if (!eq(got[k], want[k])) ok = false; });
+    return { actual: Object.keys(got).map(k => k + '→' + got[k].join('/')).join(' · '), pass: ok };
+  });
+  await check('U3', 'mondayOf: Tue 6 Oct → Mon 5 Oct; Sun 4 Oct → Mon 28 Sep; Mon 5 Oct → itself', '2026-10-05 · 2026-09-28 · 2026-10-05', () => {
+    const a = [E.mondayOf('2026-10-06'), E.mondayOf('2026-10-04'), E.mondayOf('2026-10-05')]; return { actual: a.join(' · '), pass: eq(a, ['2026-10-05', '2026-09-28', '2026-10-05']) };
+  });
+  await check('U4', 'todayIn(America/Edmonton): 05:30Z on 12 Oct is still 11 Oct; 06:30Z is 12 Oct', '2026-10-11 · 2026-10-12', () => {
+    const a = [E.todayIn('America/Edmonton', new Date('2026-10-12T05:30:00Z')), E.todayIn('America/Edmonton', new Date('2026-10-12T06:30:00Z'))];
+    return { actual: a.join(' · '), pass: eq(a, ['2026-10-11', '2026-10-12']) };
+  });
+  await check('U5', 'lastTrained excludes today when asked (decision 3)', 'before today → 2026-10-01; without → 2026-10-06', () => {
+    const log = [row('2026-10-01', 'upper', 'done'), row('2026-10-06', 'upper', 'done')];
+    const a = [E.lastTrained(log, 'upper', { before: TODAY }), E.lastTrained(log, 'upper')];
+    return { actual: a.join('; '), pass: eq(a, ['2026-10-01', '2026-10-06']) };
+  });
+  await check('U6', 'library: 102 rows, unique names, every row has a known pattern', '102 rows · 0 duplicate names · 0 unknown patterns', () => {
+    const PATTERNS = ['push', 'pull', 'squat', 'hinge', 'lunge', 'jump', 'carry', 'brace', 'rotate', 'flex', 'isolation', 'cardio', 'mobility', 'stretch'];
+    const seen = new Set(); let dup = 0, unknown = 0;
+    lib.forEach(r => { if (seen.has(r.name)) dup++; seen.add(r.name); if (!PATTERNS.includes(r.pattern)) unknown++; });
+    return { actual: lib.length + ' rows · ' + dup + ' duplicate names · ' + unknown + ' unknown patterns', pass: lib.length === 102 && dup === 0 && unknown === 0 };
+  });
+  await check('U7', 'library.js is byte-identical to knowledge/exercise-library.csv', 'identical (when the file is reachable)', async () => {
+    try {
+      const res = await fetch('../../knowledge/exercise-library.csv', { cache: 'no-store' });
+      if (!res.ok) return { actual: 'not run: file not reachable (HTTP ' + res.status + ')', pass: null };
+      const text = (await res.text()).replace(/\r\n/g, '\n');
+      const same = text === window.EXERCISE_LIBRARY_CSV.replace(/\r\n/g, '\n');
+      return { actual: same ? 'identical' : 'DIFFERENT', pass: same };
+    } catch (e) { return { actual: 'not run: file not reachable (' + e.message + ')', pass: null }; }
+  });
+  await check('U8', 'serializeLog → parseLog round trip, note with a comma and a quote', 'rows equal after round trip; a bad row is refused with its line number', () => {
+    const rows = [row('2026-10-05', 'lower', 'done', { time_selected_min: 25, equipment: 'dumbbells-only', type: 'endurance', note: 'hotel gym, "bench" wobbly' }), row('2026-10-07', 'upper', 'shortened', { actual_min: 22 })];
+    const back = E.parseLog(E.serializeLog(rows));
+    const bad = E.parseLog('date,week_start,time_selected_min,equipment,focus,type,status,actual_min,note\n2026-10-05,2026-10-05,17,basic-gym,upper,strength,done,,\n');
+    const ok = back.errors.length === 0 && eq(back.rows, rows) && bad.rows.length === 0 && /^Line 2:/.test(bad.errors[0] || '');
+    return { actual: (back.errors.length ? back.errors.join(' ') : 'round trip equal') + '; bad file → ' + (bad.errors[0] || 'no error'), pass: ok };
+  });
+  await check('U9', 'determinism: same inputs twice give the same text; different days vary the start', 'identical twice; ≥2 distinct first exercises over 7 days', () => {
+    const s = sel(30, 'basic-gym', 'upper', 'strength');
+    const a = E.buildWorkout(lib, s, [], TODAY).text, b = E.buildWorkout(lib, s, [], TODAY).text;
+    const firsts = new Set(); for (let d = 0; d < 7; d++) firsts.add(E.buildWorkout(lib, s, [], E.addDays(TODAY, d)).main.items[0].name);
+    return { actual: (a === b ? 'identical' : 'DIFFERENT') + '; ' + firsts.size + ' distinct first exercises', pass: a === b && firsts.size >= 2 };
+  });
+  await check('U10', 'pairing: FG · Upper · Strength · 45 min alternates patterns in every pair', 'A1≠A2 pattern for every pair', () => {
+    const w = E.buildWorkout(lib, sel(45, 'full-gym', 'upper', 'strength'), [], TODAY);
+    const pairs = []; for (let i = 0; i < w.main.items.length; i += 2) pairs.push(w.main.items[i].pattern + '/' + w.main.items[i + 1].pattern);
+    return { actual: pairs.join(', '), pass: pairs.every(p => { const [x, y] = p.split('/'); return x !== y; }) };
+  });
+
+  await check('U11', 'sw.js cache name carries the engine version, so a new version replaces the old cache', 'workout-builder-' + E.APP_VERSION, async () => {
+    try {
+      const t = await (await fetch('sw.js', { cache: 'no-store' })).text();
+      const m = /const CACHE = '([^']+)'/.exec(t);
+      return { actual: m ? m[1] : 'no CACHE constant found', pass: !!m && m[1] === 'workout-builder-' + E.APP_VERSION };
+    } catch (e) { return { actual: 'not run: ' + e.message, pass: null }; }
+  });
+  await check('U12', 'manifest.webmanifest is reachable: start_url "./", display standalone, two icons', 'ok', async () => {
+    try {
+      const m = await (await fetch('manifest.webmanifest', { cache: 'no-store' })).json();
+      const ok = m.start_url === './' && m.display === 'standalone' && Array.isArray(m.icons) && m.icons.length >= 2;
+      return { actual: 'start_url ' + m.start_url + ', display ' + m.display + ', icons ' + (m.icons || []).length, pass: ok };
+    } catch (e) { return { actual: 'not run: ' + e.message, pass: null }; }
+  });
+
+  /* ---- Phase 4 cases (Stephen's table) ---- */
+  await check('C1', '15 min · Bodyweight · Core · Endurance', '3 / 9 / 3; ≥2 min core in cool-down; every exercise allowed under BW; audit clean', () => {
+    const w = E.buildWorkout(lib, sel(15, 'bodyweight-only', 'core', 'endurance'), [], TODAY); const v = E.audit(w, lib);
+    return { actual: [w.blocks.warmup, w.blocks.main, w.blocks.cooldown].join(' / ') + '; core ' + w.cooldown.core.minutes + '; violations: ' + (v.join('; ') || 'none'), pass: w.blocks.warmup === 3 && w.blocks.main === 9 && w.blocks.cooldown === 3 && w.cooldown.core.minutes >= 2 && v.length === 0 };
+  });
+  await check('C2', '120 min · Full gym · Total · Strength', '10 / 100 / 10; ≥5 min core; A1/A2 pairs; 3–6 reps; audit clean', () => {
+    const w = E.buildWorkout(lib, sel(120, 'full-gym', 'total', 'strength'), [], TODAY); const v = E.audit(w, lib);
+    const tags = w.main.items.map(i => i.tag).join(' ');
+    return { actual: [w.blocks.warmup, w.blocks.main, w.blocks.cooldown].join(' / ') + '; core ' + w.cooldown.core.minutes + '; tags ' + tags + '; violations: ' + (v.join('; ') || 'none'), pass: w.blocks.main === 100 && w.cooldown.core.minutes >= 5 && /A1 A2/.test(tags) && v.length === 0 };
+  });
+  await check('C3', '30 min · Dumbbells only · Upper · Strength', 'No bench press, seated DB press, bench-supported row or cable row; floor press allowed', () => {
+    const w = E.buildWorkout(lib, sel(30, 'dumbbells-only', 'upper', 'strength'), [], TODAY);
+    const pool = E.allowedExercises(lib, sel(30, 'dumbbells-only', 'upper', 'strength')).pool.map(r => r.name);
+    const banned = ['Barbell bench press', 'Dumbbell bench press', 'Seated dumbbell overhead press', 'One-arm dumbbell row (bench-supported)', 'Seated cable row'];
+    const leaked = banned.filter(b => pool.includes(b) || names(w).includes(b));
+    return { actual: 'pool: ' + pool.join(', ') + '; leaked: ' + (leaked.join(', ') || 'none') + '; violations: ' + (E.audit(w, lib).join('; ') || 'none'), pass: leaked.length === 0 && pool.includes('Dumbbell floor press') && E.audit(w, lib).length === 0 };
+  });
+  await check('C4', 'Bodyweight · Total · Strength (30 min)', 'Substitution note shown; only BW exercises; audit clean', () => {
+    const w = E.buildWorkout(lib, sel(30, 'bodyweight-only', 'total', 'strength'), [], TODAY); const v = E.audit(w, lib);
+    const allBW = names(w).every(n => E.findRow(lib, n).allowed.includes('BW'));
+    return { actual: 'note: ' + (w.notes[0] || 'NONE') + '; all BW: ' + allBW + '; violations: ' + (v.join('; ') || 'none'), pass: /has no exercise/.test(w.notes[0] || '') && allBW && v.length === 0 };
+  });
+  await check('C5', 'Bodyweight · Core · Power (15 min)', 'Substitution note shown; delivered as Core · Endurance; only BW exercises; audit clean', () => {
+    const w = E.buildWorkout(lib, sel(15, 'bodyweight-only', 'core', 'power'), [], TODAY); const v = E.audit(w, lib);
+    const allBW = names(w).every(n => E.findRow(lib, n).allowed.includes('BW'));
+    return { actual: 'note: ' + (w.notes[0] || 'NONE') + '; header type: ' + w.header.type + ' (chose ' + w.header.chosenType + '); all BW: ' + allBW + '; violations: ' + (v.join('; ') || 'none'), pass: /Core only · Endurance/.test(w.notes[0] || '') && w.header.typeChanged && allBW && v.length === 0 };
+  });
+  await check('C6', 'Basic gym · Cardio · Strength by machine checklist', 'none → hill/stair; treadmill → incline walk; bike → resistance intervals; both → both offered', () => {
+    const run = m => { const w = E.buildWorkout(lib, sel(30, 'basic-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives).sort(); };
+    const a = run([]), b = run(['treadmill']), c = run(['bike']), d = run(['treadmill', 'bike']);
+    const ok = eq(a, ['Hill or stair climbing']) && eq(b, ['Hill or stair climbing', 'Treadmill steep incline walk']) && eq(c, ['Bike heavy-resistance intervals', 'Hill or stair climbing']) && eq(d, ['Bike heavy-resistance intervals', 'Hill or stair climbing', 'Treadmill steep incline walk']);
+    return { actual: 'none: ' + a.join('|') + '; treadmill: ' + b.join('|') + '; bike: ' + c.join('|') + '; both: ' + d.join('|'), pass: ok };
+  });
+  await check('C7', 'Empty log', 'weeklyCount 0; lastTrained null (shown as "no record yet")', () => {
+    const a = [E.weeklyCount([], TODAY), E.lastTrained([], 'upper')]; return { actual: JSON.stringify(a), pass: eq(a, [0, null]) };
+  });
+  await check('C8', 'Log: Mon done, Wed skipped, Thu shortened, Fri swapped', 'Count = 3', () => {
+    const log = [row('2026-10-05', 'lower', 'done'), row('2026-10-07', 'upper', 'skipped'), row('2026-10-08', 'core', 'shortened'), row('2026-10-09', 'cardio', 'swapped')];
+    const n = E.weeklyCount(log, '2026-10-10'); return { actual: n, pass: n === 3 };
+  });
+  await check('C9', 'Sunday entry, then view on Monday', 'Sunday view 1; Monday view 0', () => {
+    const log = [row('2026-10-11', 'lower', 'done')]; const a = [E.weeklyCount(log, '2026-10-11'), E.weeklyCount(log, '2026-10-12')];
+    return { actual: a.join(' / '), pass: eq(a, [1, 0]) };
+  });
+  await check('C10', 'Last upper session skipped; an earlier one done', '"Last trained" shows the earlier date 2026-10-01', () => {
+    const log = [row('2026-10-01', 'upper', 'done'), row('2026-10-05', 'upper', 'skipped')]; const a = E.lastTrained(log, 'upper'); return { actual: a, pass: a === '2026-10-01' };
+  });
+  await check('C11', 'Time 17, or 130', 'Rejected with a clear message', () => {
+    const a = throwsRange(() => E.blockMinutes(17)) && throwsRange(() => E.blockMinutes(130)) && throwsRange(() => E.blockMinutes('30'));
+    const msg = E.validateSelections(sel(17, 'basic-gym', 'upper', 'strength'))[0];
+    return { actual: (a ? 'RangeError thrown' : 'NOT thrown') + '; message: ' + msg, pass: a && /15 to 120/.test(msg || '') };
+  });
+  await check('C12', 'Weekly goal 0, or 8', 'Rejected with a clear message; 4 accepted', () => {
+    const a = [E.validateGoal(0), E.validateGoal(8), E.validateGoal(4), E.validateGoal('3.5')];
+    return { actual: a.map(x => x === null ? 'ok' : x).join(' | '), pass: a[0] && a[1] && a[2] === null && a[3] };
+  });
+
+  /* ---- exhaustive sweeps ---- */
+  const sweep = (label, machinesFor) => {
+    let n = 0, bad = 0, notes = 0, texts = []; const samples = [];
+    E.TIMES.forEach(t => E.EQUIPMENT.forEach(e => E.FOCUS.forEach(f => E.TYPES.forEach(ty => {
+      const s = { time: t, equipment: e.key, focus: f.key, type: ty.key, machines: machinesFor(e.key) };
+      try {
+        const w = E.buildWorkout(lib, s, [], TODAY); const v = E.audit(w, lib); n++;
+        if (w.notes.length) notes++;
+        if (v.length) { bad++; if (samples.length < 5) samples.push(t + ' ' + e.key + ' ' + f.key + ' ' + ty.key + ': ' + v.join('; ')); }
+        texts.push(w.text);
+      } catch (err) { n++; bad++; if (samples.length < 5) samples.push(t + ' ' + e.key + ' ' + f.key + ' ' + ty.key + ': ERROR ' + err.message); }
+    }))));
+    return { n, bad, notes, texts, samples };
+  };
+  const X1 = sweep('default machines', k => (E.DEFAULT_MACHINES[k] || []).slice());
+  await check('C13', 'Exhaustive: 22 times × 5 equipment × 5 focus × 3 types, default machines', '1,650 combinations: blocks sum, core ≥ minimum, zero equipment violations, no repeats', () => ({
+    actual: X1.n + ' built; ' + X1.bad + ' with violations; ' + X1.notes + ' carry a note' + (X1.samples.length ? '; e.g. ' + X1.samples.join(' || ') : ''), pass: X1.n === 1650 && X1.bad === 0
+  }));
+  const X2 = sweep('all machines', k => (k in E.DEFAULT_MACHINES) ? E.MACHINES.slice() : []);
+  const X3 = sweep('no machines', () => []);
+  await check('C13b', 'Exhaustive again with every machine ticked, and with none', '2 × 1,650 combinations, zero violations', () => ({
+    actual: (X2.n + X3.n) + ' built; ' + (X2.bad + X3.bad) + ' with violations' + ((X2.samples.concat(X3.samples)).length ? '; e.g. ' + X2.samples.concat(X3.samples).join(' || ') : ''), pass: X2.bad === 0 && X3.bad === 0 && X2.n === 1650 && X3.n === 1650
+  }));
+  await check('C14', 'Text scan of all generated workouts', 'No weights stated; no "push through"; safety line present in every one', () => {
+    const all = X1.texts.concat(X2.texts, X3.texts);
+    const weights = all.filter(t => /\b\d+(\.\d+)?\s?(kg|kgs|kilo|kilos|lb|lbs|pound|pounds)\b/i.test(t)).length;
+    const push = all.filter(t => /push(ing)? through/i.test(t)).length;
+    const noSafety = all.filter(t => t.indexOf(E.SAFETY_LINE) < 0).length;
+    return { actual: all.length + ' texts; weights: ' + weights + '; push-through: ' + push + '; missing safety line: ' + noSafety, pass: weights === 0 && push === 0 && noSafety === 0 };
+  });
+  await check('C15', 'Export, clear, import (engine part; the screen part is slice 3)', 'Log restored exactly in training-log.csv format', () => {
+    const rows = [row('2026-10-05', 'lower', 'done', { time_selected_min: 25, equipment: 'dumbbells-only', type: 'endurance' }), row('2026-10-06', 'upper', 'swapped', { focus: 'lower', type: 'endurance', note: 'selected: upper/strength' })];
+    const csv = E.serializeLog(rows); const back = E.parseLog(csv);
+    return { actual: (csv.split('\n')[0] === E.LOG_FIELDS.join(',') ? 'header exact; ' : 'HEADER WRONG; ') + (eq(back.rows, rows) ? 'rows equal' : 'rows differ'), pass: csv.split('\n')[0] === E.LOG_FIELDS.join(',') && eq(back.rows, rows) };
+  });
+
+  /* ---- report ---- */
+  const tb = document.querySelector('#t tbody');
+  let pass = 0, fail = 0, notRun = 0;
+  results.forEach(r => {
+    const tr = document.createElement('tr');
+    const cls = r.pass === null ? 'n' : (r.pass ? 'p' : 'f');
+    const label = r.pass === null ? 'not run' : (r.pass ? 'pass' : 'FAIL');
+    if (r.pass === null) notRun++; else if (r.pass) pass++; else fail++;
+    tr.innerHTML = '<td>' + r.id + '</td><td>' + r.name + '</td><td>' + r.expected + '</td><td>' + r.actual.replace(/</g, '&lt;') + '</td><td class="' + cls + '">' + label + '</td><td>' + r.version + '</td><td>' + r.date + '</td>';
+    tb.appendChild(tr);
+  });
+  const sum = document.getElementById('summary');
+  sum.textContent = pass + ' pass · ' + fail + ' fail · ' + notRun + ' not run · engine ' + E.APP_VERSION + ' · spec ' + E.SPEC_VERSION + ' · ' + RUN_DATE;
+  if (fail) sum.classList.add('bad');
+  document.getElementById('md').value = ['| # | Case | Expected | Actual | Pass/fail | Version | Date |', '|---|---|---|---|---|---|---|']
+    .concat(results.map(r => '| ' + [r.id, r.name, r.expected, r.actual.replace(/\|/g, '\\|'), r.pass === null ? 'not run' : (r.pass ? 'pass' : 'FAIL'), r.version, r.date].join(' | ') + ' |')).join('\n');
+  window.TEST_RESULTS = { pass, fail, notRun, results, samples: { X1: X1.samples, X2: X2.samples, X3: X3.samples } };
+})();
+</script>
+</body>
+</html>

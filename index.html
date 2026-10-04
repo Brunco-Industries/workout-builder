@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Workout builder</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f5f3f">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Workout">
+<style>
+  :root{--bg:#f3f3ef;--card:#fff;--ink:#1c1c1a;--muted:#62665e;--line:#d8d8d1;--accent:#1f5f3f;--accent-ink:#fff;--chip:#e6efe8;--standin:#fff4cc;--standin-ink:#5b4300;--core:#eef3ff;--warn:#b3261e;--warn-bg:#fff0ee;--warn-line:#f1c9c4;--ok-bg:#e8f3ec}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .app{max-width:430px;margin:0 auto;padding:12px 14px calc(24px + env(safe-area-inset-bottom))}
+  h1{font-size:1.25rem;margin:6px 0 8px}
+  .row{margin:10px 0}
+  .lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chips.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .chip{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:8px 12px;font:inherit;font-size:.9rem;color:var(--ink);flex:0 0 auto;scroll-snap-align:start;min-height:40px}
+  .chip[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:700;background:var(--accent);color:var(--accent-ink);margin:10px 0 4px}
+  .btn[disabled]{background:#c9d3cc;color:#3b4a40}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+  .btn.small{width:auto;display:inline-block;padding:8px 12px;margin:4px 6px 0 0;font-size:.9rem}
+  .needs,.hint{font-size:.86rem;color:var(--muted);margin:0 0 6px}
+  .err{color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:10px;padding:8px 10px;margin:8px 0;font-size:.92rem}
+  .banner{background:var(--standin);color:var(--standin-ink);border:1px solid #e3c96a;border-radius:10px;padding:8px 12px;font-size:.86rem;margin:0 0 10px}
+  /* goal strip */
+  .goal{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+  .goal .lbl{display:block;margin:0}
+  .goal b{font-size:1.15rem}
+  .goal .dots{font-size:1.1rem;letter-spacing:3px;color:var(--accent)}
+  .goal .date{font-size:.78rem;color:var(--muted);text-align:right}
+  .goal button{font:inherit;font-size:.78rem;background:none;border:0;color:var(--accent);text-decoration:underline;padding:0;margin-top:2px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+  .card h3{margin:0 0 6px;font-size:1rem}
+  .field{display:flex;gap:8px;align-items:center;margin:6px 0}
+  .field label{margin:0;min-width:92px}
+  .field input{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);width:100%;background:#fff;min-height:40px}
+  .field input[type=number]{max-width:130px}
+  .ferr{color:var(--warn);font-size:.86rem;margin:4px 0 0}
+  .ok{background:var(--ok-bg);border-radius:8px;padding:6px 10px;font-size:.9rem}
+  /* result */
+  .result{margin-top:12px}
+  .result.stale{opacity:.55}
+  .stale-note,.subst{background:var(--standin);color:var(--standin-ink);border:1px solid #e3c96a;border-radius:10px;padding:8px 10px;font-size:.92rem;margin:6px 0}
+  .title{font-weight:700;font-size:1.1rem;margin:0}
+  .sub{color:var(--muted);font-size:.9rem;margin:0 0 6px}
+  .block{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+  .block h4,.block h5{display:flex;justify-content:space-between;margin:0 0 6px;font-size:1rem}
+  .block h5{font-size:.95rem}
+  .min{color:var(--accent);font-weight:700}
+  .block ul,.block ol{margin:0;padding-left:1.1rem}
+  .block li{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed #ebebe6}
+  .block li:last-child{border-bottom:0}
+  .block ul li>span:last-child{white-space:nowrap}
+  .block ol li{display:block}
+  .block ol li b{display:inline-block;min-width:1.7rem;color:var(--accent)}
+  .block ol li small{display:block;color:var(--muted);font-size:.82rem}
+  .note{font-size:.86rem;color:var(--muted);margin:0 0 6px}
+  .small{font-size:.86rem;color:var(--muted);margin:6px 0 0}
+  .core{background:var(--core);border-radius:10px;padding:8px 10px;margin-top:8px}
+  .check{font-weight:700;margin:8px 0 2px}
+  .safety{font-size:.9rem;background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:10px;padding:8px 10px;margin:8px 0}
+  .meta{font-size:.95rem;margin:8px 0;display:grid;gap:4px}
+  /* log */
+  .logwrap{position:sticky;bottom:0;background:var(--bg);padding:8px 0 calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);margin-top:8px}
+  .logbar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .logbar button{font:inherit;font-size:.9rem;font-weight:700;padding:12px 4px;border-radius:10px;border:1px solid var(--accent);background:var(--card);color:var(--accent);min-height:44px}
+  .logbar button:first-child{background:var(--accent);color:#fff}
+  .recorded{background:var(--card);border:2px solid var(--accent);border-radius:12px;padding:12px;margin:10px 0}
+  .recorded h3{margin:0 0 4px;font-size:1rem}
+  table.rowtbl{border-collapse:collapse;width:100%;font-size:.84rem;margin:8px 0}
+  table.rowtbl td{border:1px solid var(--line);padding:4px 6px;vertical-align:top;word-break:break-word}
+  table.rowtbl td:first-child{color:var(--muted);width:40%}
+  .backup{margin-top:18px}
+  .backup textarea{width:100%;height:120px;font:12px/1.3 ui-monospace,Consolas,monospace;margin:6px 0;border:1px solid var(--line);border-radius:8px;padding:6px}
+  .backup summary{cursor:pointer;color:var(--muted);font-size:.86rem}
+  .backup ul{margin:6px 0 0;padding-left:1.1rem;font-size:.86rem;color:var(--warn)}
+  .update{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .update button{font:inherit;font-size:.86rem;font-weight:700;border:1px solid #e3c96a;background:#fff;border-radius:8px;padding:6px 10px}
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 14px;border-radius:10px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+  .toast.show{opacity:1}
+  .footer{color:var(--muted);font-size:.8rem;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Workout builder</h1>
+  <div id="updateBanner" class="banner update" hidden><span>A new version is ready.</span><button type="button" id="reloadBtn">Reload</button></div>
+  <div id="storageBanner" class="banner" hidden></div>
+  <div id="loadError" class="err" hidden></div>
+
+  <div id="goalArea"></div>
+
+  <p class="needs" id="needsLine">To build a workout the app needs: time, equipment, focus and type.</p>
+  <div class="row"><span class="lbl">Time (minutes, includes warm-up and cool-down)</span><div class="chips scroll" id="timeChips"></div></div>
+  <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div></div>
+  <div class="row" id="machineRow" hidden><span class="lbl">Cardio machines here (tick any)</span><div class="chips" id="machineChips"></div></div>
+  <div class="row"><span class="lbl">Focus</span><div class="chips" id="focusChips"></div></div>
+  <div class="row"><span class="lbl">Type</span><div class="chips" id="typeChips"></div></div>
+
+  <button class="btn" id="buildBtn" type="button" disabled>Choose time, equipment, focus and type</button>
+  <p class="hint" id="splitHint"></p>
+
+  <div id="resultArea"></div>
+  <div id="logArea"></div>
+
+  <section class="card backup" id="backup">
+    <h3>Log backup</h3>
+    <p class="hint" id="backupInfo"></p>
+    <div>
+      <button class="btn small" id="exportBtn" type="button">Export log (CSV)</button>
+      <button class="btn small ghost" id="importBtn" type="button">Import log (CSV)</button>
+      <input type="file" id="importFile" accept=".csv,text/csv,text/plain" hidden>
+    </div>
+    <div id="importArea"></div>
+    <details id="csvDetails">
+      <summary>Show the CSV text</summary>
+      <textarea id="csvText" readonly aria-label="The log as CSV"></textarea>
+      <button class="btn small ghost" id="copyBtn" type="button">Copy to clipboard</button>
+    </details>
+  </section>
+
+  <p class="footer" id="footer"></p>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="engine.js"></script>
+<script src="library.js"></script>
+<script>
+(function () {
+  'use strict';
+  const E = window.Engine;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let LIB;
+  try { LIB = E.parseLibrary(window.EXERCISE_LIBRARY_CSV); }
+  catch (e) { $('loadError').hidden = false; $('loadError').textContent = 'The exercise library could not be read: ' + e.message; return; }
+
+  /* ---------- the record: localStorage, one key; nothing leaves the phone ---------- */
+  const KEY = 'workout-builder:v1';
+  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [] });
+  let storageOk = true;
+  function loadState() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) { storageOk = false; return fresh(); }
+    if (!raw) return fresh();
+    let d;
+    try { d = JSON.parse(raw); } catch (e) { return Object.assign(fresh(), { quarantine: [{ raw }] }); }
+    const st = fresh();
+    if (E.validateGoal(d.goal) === null) st.goal = Number(d.goal);
+    (Array.isArray(d.log) ? d.log : []).forEach(r => { if (r && E.validateLogRow(r).length === 0) st.log.push(r); else st.quarantine.push(r); });
+    st.quarantine = st.quarantine.concat(Array.isArray(d.quarantine) ? d.quarantine : []);
+    st.lastId = st.log.some(r => r.id === d.lastId) ? d.lastId : null;
+    return st;
+  }
+  function saveState(keepImportUndo) {
+    if (!keepImportUndo) S.importUndo = null; // any other change to the record ends the "Undo import" window
+    try { localStorage.setItem(KEY, JSON.stringify(ST)); storageOk = true; }
+    catch (e) { storageOk = false; }
+    renderStorageBanner();
+    if (typeof renderBackup === 'function') renderBackup();
+  }
+  function renderStorageBanner() {
+    const b = $('storageBanner');
+    if (!storageOk) { b.hidden = false; b.textContent = 'This browser cannot save. The goal and the log will be lost when the app closes. Open the app in Safari or from the home screen.'; return; }
+    if (ST.quarantine.length) { b.hidden = false; b.textContent = ST.quarantine.length + ' saved entr' + (ST.quarantine.length === 1 ? 'y' : 'ies') + ' could not be read and ' + (ST.quarantine.length === 1 ? 'is' : 'are') + ' left out of the count. Nothing was guessed or deleted.'; return; }
+    b.hidden = true;
+  }
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  const ST = loadState();
+  const S = { sel: { time: null, equipment: null, machines: [], focus: null, type: null }, result: null, stale: false, swapping: false, goalEditing: false, importUndo: null };
+  const today = () => E.todayIn();
+  $('footer').textContent = 'deliverables/app · engine ' + E.APP_VERSION + ' · spec ' + E.SPEC_VERSION + ' · today ' + today() + ' (America/Edmonton) · the log stays on this phone';
+  renderStorageBanner();
+
+  let toastTimer;
+  function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 1800); }
+
+  /* ---------- story 1: the goal and this week's count ---------- */
+  function renderGoal() {
+    const count = E.weeklyCount(ST.log, today());
+    const el = $('goalArea');
+    if (ST.goal === null || S.goalEditing) {
+      el.innerHTML = '<div class="card"><h3>' + (ST.goal === null ? 'Set your weekly goal' : 'Change your weekly goal') + '</h3>' +
+        '<p class="hint">Workouts per week, 1 to 7. You can change it any time.</p>' +
+        '<div class="field"><input id="goalInput" type="number" inputmode="numeric" min="1" max="7" step="1" value="' + (ST.goal === null ? '' : ST.goal) + '" aria-label="Weekly goal"> <button class="btn small" id="goalSave" type="button">Save goal</button>' + (ST.goal !== null ? ' <button class="btn small ghost" id="goalCancel" type="button">Cancel</button>' : '') + '</div>' +
+        '<p class="ferr" id="goalErr" hidden></p>' +
+        '<p class="hint" style="margin-top:8px">This week so far: <b>' + count + '</b> logged (' + E.longDate(today()) + ').</p></div>';
+      $('goalSave').onclick = () => {
+        const v = $('goalInput').value.trim(), err = E.validateGoal(v);
+        if (err) { const e = $('goalErr'); e.hidden = false; e.textContent = err + ' You entered "' + v + '".'; return; }
+        ST.goal = Number(v); S.goalEditing = false; saveState(); renderGoal(); renderResult(); toast('Goal saved: ' + ST.goal + ' a week');
+      };
+      if ($('goalCancel')) $('goalCancel').onclick = () => { S.goalEditing = false; renderGoal(); };
+      return;
+    }
+    let dots = ''; for (let i = 0; i < ST.goal; i++) dots += i < count ? '●' : '○';
+    el.innerHTML = '<div class="goal"><div><span class="lbl">This week</span><b>' + count + ' of ' + ST.goal + '</b> workouts</div><div class="dots" aria-label="' + count + ' of ' + ST.goal + '">' + dots + '</div><div class="date">' + esc(E.longDate(today())) + '<br><button type="button" id="goalEdit">Change goal</button></div></div>';
+    $('goalEdit').onclick = () => { S.goalEditing = true; renderGoal(); };
+  }
+
+  /* ---------- story 2: the selections and the workout ---------- */
+  function chipRow(id, list, isOn, onTap) {
+    const c = $(id); c.innerHTML = '';
+    list.forEach(([key, text]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = text;
+      b.setAttribute('aria-pressed', isOn(key) ? 'true' : 'false'); b.onclick = () => onTap(key); c.appendChild(b);
+    });
+  }
+  function changed() { if (S.result) S.stale = true; S.swapping = false; renderSelectors(); renderBuild(); renderResult(); renderLog(); }
+  function renderSelectors() {
+    chipRow('timeChips', E.TIMES.map(t => [t, String(t)]), k => S.sel.time === k, k => { S.sel.time = k; changed(); });
+    chipRow('equipChips', E.EQUIPMENT.map(e => [e.key, e.label]), k => S.sel.equipment === k, k => { S.sel.equipment = k; S.sel.machines = (E.DEFAULT_MACHINES[k] || []).slice(); changed(); });
+    const gym = S.sel.equipment in E.DEFAULT_MACHINES;
+    $('machineRow').hidden = !gym;
+    if (gym) chipRow('machineChips', E.MACHINES.map(m => [m, m[0].toUpperCase() + m.slice(1)]), k => S.sel.machines.includes(k), k => {
+      S.sel.machines = S.sel.machines.includes(k) ? S.sel.machines.filter(x => x !== k) : S.sel.machines.concat([k]); changed();
+    });
+    chipRow('focusChips', E.FOCUS.map(f => [f.key, f.label]), k => S.sel.focus === k, k => { S.sel.focus = k; changed(); });
+    chipRow('typeChips', E.TYPES.map(t => [t.key, t.label]), k => S.sel.type === k, k => { S.sel.type = k; changed(); });
+    const on = $('timeChips').querySelector('[aria-pressed=true]'); if (on) { try { on.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) {} }
+  }
+  function missing() {
+    const m = []; if (S.sel.time === null) m.push('time'); if (!S.sel.equipment) m.push('equipment'); if (!S.sel.focus) m.push('focus'); if (!S.sel.type) m.push('type'); return m;
+  }
+  const joinAnd = a => a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  function renderBuild() {
+    const m = missing(), b = $('buildBtn'), h = $('splitHint');
+    if (m.length) { b.disabled = true; b.textContent = 'Choose ' + joinAnd(m); $('needsLine').textContent = 'Still needed: ' + joinAnd(m) + '.'; h.textContent = ''; return; }
+    const bm = E.blockMinutes(S.sel.time);
+    b.disabled = false; b.textContent = 'Build workout · ' + bm.warmup + ' / ' + bm.main + ' / ' + bm.cooldown;
+    $('needsLine').textContent = 'All four chosen.';
+    h.textContent = 'Core in the cool-down: at least ' + bm.minCore + ' min.';
+  }
+  $('buildBtn').onclick = () => {
+    try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today()); S.stale = false; S.swapping = false; }
+    catch (e) { S.result = null; $('resultArea').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; $('logArea').innerHTML = ''; return; }
+    ST.lastId = null; // a new workout on screen: the previous entry stays recorded, but Undo now belongs to the next one
+    saveState();
+    renderResult(); renderLog();
+    const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const list = items => '<ul>' + items.map(i => '<li>' + esc(i.name) + ' <span>' + esc(i.text) + '</span></li>').join('') + '</ul>';
+  function renderResult() {
+    const el = $('resultArea');
+    if (!S.result) { el.innerHTML = ''; return; }
+    const w = S.result, b = w.blocks;
+    const lt = E.lastTrained(ST.log, w.selections.focus, { before: w.date });
+    const count = E.weeklyCount(ST.log, today());
+    const stale = S.stale ? '<div class="stale-note">Selections changed. Tap Build to refresh. The workout below is for the previous selections and cannot be logged.</div>' : '';
+    const mainItems = '<ol>' + w.main.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>';
+    el.innerHTML = stale + '<div class="result' + (S.stale ? ' stale' : '') + '">' +
+      '<p class="title">' + esc(w.header.focus) + ' · ' + esc(w.header.type) + (w.header.typeChanged ? ' <span class="sub">(you chose ' + esc(w.header.chosenType) + ')</span>' : '') + ' · ' + w.header.total + ' min</p>' +
+      '<p class="sub">' + esc(w.header.equipment) + (w.header.showsMachines ? (w.header.machines.length ? ' · machines: ' + esc(w.header.machines.join(', ')) : ' · no cardio machines ticked') : '') + '</p>' +
+      w.notes.map(n => '<div class="subst">' + esc(n) + '</div>').join('') +
+      '<section class="block"><h4>Warm-up <span class="min">' + b.warmup + ' min</span></h4>' + list(w.warmup) + '</section>' +
+      '<section class="block"><h4>Main block <span class="min">' + b.main + ' min</span></h4><p class="note">' + esc(w.main.intro) + '</p>' + mainItems +
+        (w.main.alternatives && w.main.alternatives.length ? '<p class="small">Also fits: ' + esc(w.main.alternatives.join(', ')) + '</p>' : '') +
+        (w.main.tail ? '<p class="small">' + esc(w.main.tail) + '</p>' : '') + '</section>' +
+      '<section class="block"><h4>Cool-down <span class="min">' + b.cooldown + ' min</span></h4>' + list(w.cooldown.stretch) +
+        '<div class="core"><h5>Core <span class="min">' + w.cooldown.core.minutes + ' min</span></h5>' + list(w.cooldown.core.items) + '<p class="small" style="margin-top:4px">' + esc(w.cooldown.core.tail) + '</p></div></section>' +
+      '<p class="check">Block check: ' + b.warmup + ' + ' + b.main + ' + ' + b.cooldown + ' = ' + w.check.sum + ' min ' + (w.check.sum === w.check.total ? '✓' : '✗') + ' · core ' + w.check.coreMinutes + ' ≥ ' + w.check.minCore + ' ' + (w.check.coreMinutes >= w.check.minCore ? '✓' : '✗') + '</p>' +
+      '<p class="safety">' + esc(w.safety) + '</p>' +
+      '<div class="meta"><div>Last trained ' + esc(w.header.focus) + ': <b>' + (lt ? esc(E.longDate(lt)) : 'no record yet') + '</b></div>' +
+      '<div>This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b> workouts' + (ST.goal === null ? ' logged · no goal set yet' : '') + '</div></div></div>';
+  }
+
+  /* ---------- story 3: log it, see the row, undo ---------- */
+  const lastEntry = () => ST.lastId ? ST.log.find(r => r.id === ST.lastId) || null : null;
+  function renderLog() {
+    const el = $('logArea');
+    const entry = lastEntry();
+    if (entry) { renderRecorded(el, entry); return; }
+    const canLog = S.result && !S.stale;
+    if (!canLog) { el.innerHTML = ''; return; }
+    if (S.swapping) {
+      el.innerHTML = '<div class="card"><h3>Swapped: what did you do instead?</h3>' +
+        '<div class="row"><span class="lbl">Focus actually trained</span><div class="chips" id="swFocus"></div></div>' +
+        '<div class="row"><span class="lbl">Type actually trained</span><div class="chips" id="swType"></div></div>' +
+        '<button class="btn" id="swSave" type="button" disabled>Choose focus and type</button><button class="btn ghost" id="swCancel" type="button">Cancel</button></div>';
+      const sw = { focus: null, type: null };
+      const refresh = () => {
+        chipRow('swFocus', E.FOCUS.map(f => [f.key, f.label]), k => sw.focus === k, k => { sw.focus = k; refresh(); });
+        chipRow('swType', E.TYPES.map(t => [t.key, t.label]), k => sw.type === k, k => { sw.type = k; refresh(); });
+        const ok = sw.focus && sw.type; $('swSave').disabled = !ok; $('swSave').textContent = ok ? 'Save as swapped' : 'Choose focus and type';
+      };
+      refresh();
+      $('swSave').onclick = () => record('swapped', sw);
+      $('swCancel').onclick = () => { S.swapping = false; renderLog(); };
+      return;
+    }
+    el.innerHTML = '<div class="logwrap"><span class="lbl">Log this workout</span><div class="logbar">' +
+      '<button type="button" data-status="done">Done</button><button type="button" data-status="shortened">Shortened</button><button type="button" data-status="swapped">Swapped</button><button type="button" data-status="skipped">Skipped</button></div></div>';
+    el.querySelectorAll('[data-status]').forEach(b => {
+      b.onclick = () => { const st = b.getAttribute('data-status'); if (st === 'swapped') { S.swapping = true; renderLog(); return; } record(st, null); };
+    });
+  }
+  function record(status, swapped) {
+    if (!S.result || S.stale) return; // never log a workout other than the one on screen
+    const w = S.result, d = today();
+    const row = {
+      id: newId(), date: d, week_start: E.mondayOf(d), time_selected_min: w.selections.time, equipment: w.selections.equipment,
+      focus: swapped ? swapped.focus : w.selections.focus, type: swapped ? swapped.type : w.selections.type,
+      status, actual_min: '', note: swapped ? 'selected: ' + w.selections.focus + '/' + w.selections.type : ''
+    };
+    const errs = E.validateLogRow(row);
+    if (errs.length) { toast('Not recorded: ' + errs[0]); return; }
+    ST.log.push(row); ST.lastId = row.id; S.swapping = false; saveState();
+    renderGoal(); renderResult(); renderLog();
+    const r = $('logArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function renderRecorded(el, row) {
+    const count = E.weeklyCount(ST.log, today());
+    const counts = row.status === 'skipped' ? 'Skipped does not count toward the goal.' : 'Counts toward this week.';
+    el.innerHTML = '<div class="recorded"><h3>Recorded · ' + esc(E.focusLabel(row.focus)) + ' · ' + esc(E.typeLabel(row.type)) + ' · ' + esc(row.status) + '</h3>' +
+      '<p class="ok" id="recCount">' + counts + ' This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b>.</p>' +
+      '<p class="hint" style="margin:8px 0 4px">This is the row saved on this phone, in the <code>training-log.csv</code> format. Nothing was sent anywhere.</p>' +
+      '<table class="rowtbl" id="rowTbl"></table>' +
+      '<div class="field"><label for="dateIn" class="lbl">Date trained</label><input id="dateIn" type="date" value="' + esc(row.date) + '" max="' + esc(today()) + '"></div>' +
+      '<div class="field"><label for="minIn" class="lbl">Actual minutes</label><input id="minIn" type="number" inputmode="numeric" min="1" max="300" placeholder="optional, blank stays blank" value="' + esc(row.actual_min) + '"></div>' +
+      '<div class="field"><label for="noteIn" class="lbl">Note</label><input id="noteIn" type="text" placeholder="optional, your words" value="' + esc(row.note) + '"></div>' +
+      '<p class="ferr" id="recErr" hidden></p>' +
+      '<button class="btn ghost" id="undoBtn" type="button">Undo this entry</button></div>';
+    const tbl = () => {
+      $('rowTbl').innerHTML = E.LOG_FIELDS.map(k => '<tr><td>' + k + '</td><td>' + (row[k] === '' ? '<span class="hint">blank</span>' : esc(row[k])) + '</td></tr>').join('');
+    };
+    const refreshCount = () => { const c = E.weeklyCount(ST.log, today()); $('recCount').innerHTML = counts + ' This week: <b>' + c + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b>.'; };
+    tbl();
+    $('dateIn').onchange = () => {
+      const v = $('dateIn').value, e = $('recErr');
+      if (!E.isDate(v) || v > today()) { e.hidden = false; e.textContent = 'The date must be a real day, today or earlier.'; $('dateIn').value = row.date; return; }
+      e.hidden = true; row.date = v; row.week_start = E.mondayOf(v); saveState(); tbl(); renderGoal(); renderResult(); refreshCount();
+    };
+    $('minIn').oninput = () => {
+      const v = $('minIn').value.trim(), e = $('recErr');
+      if (v !== '' && (!/^\d+$/.test(v) || Number(v) < 1)) { e.hidden = false; e.textContent = 'Actual minutes must be a whole number of at least 1, or left blank.'; return; }
+      e.hidden = true; row.actual_min = v === '' ? '' : Number(v); saveState(); tbl();
+    };
+    $('noteIn').oninput = () => { row.note = $('noteIn').value; saveState(); tbl(); };
+    $('undoBtn').onclick = () => {
+      const i = ST.log.findIndex(r => r.id === row.id);
+      if (i >= 0) ST.log.splice(i, 1);
+      ST.lastId = null; saveState();
+      renderGoal(); renderResult(); renderLog(); toast('Entry removed. Nothing is recorded for it.');
+    };
+  }
+
+  /* ---------- log backup: export and import in the training-log.csv format; nothing is sent anywhere ---------- */
+  function renderBackup() {
+    const n = ST.log.length;
+    $('backupInfo').textContent = n + ' entr' + (n === 1 ? 'y' : 'ies') + ' on this phone. The log lives only here: export it once a week. A file in the training-log.csv format restores it.';
+    $('csvText').value = E.serializeLog(ST.log);
+  }
+  async function exportLog() {
+    const csv = E.serializeLog(ST.log), name = 'training-log-' + today() + '.csv';
+    $('csvText').value = csv;
+    try {
+      const file = new File([csv], name, { type: 'text/csv' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: name }); toast('Shared ' + name); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+    } catch (e) { /* no File or share support: fall through to the download */ }
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    $('csvDetails').open = true;
+    toast('Download started: ' + name + '. The CSV text is also shown below.');
+  }
+  $('exportBtn').onclick = exportLog;
+  $('copyBtn').onclick = async () => {
+    try { await navigator.clipboard.writeText($('csvText').value); toast('CSV copied'); }
+    catch (e) { $('csvText').select(); toast('Select the text and copy it'); }
+  };
+  $('importBtn').onclick = () => { $('importFile').value = ''; $('importFile').click(); };
+  $('importFile').onchange = async () => {
+    const f = $('importFile').files && $('importFile').files[0];
+    if (!f) return;
+    const text = await f.text();
+    const parsed = E.parseLog(text);
+    const area = $('importArea');
+    if (parsed.errors.length) {
+      const shown = parsed.errors.slice(0, 10);
+      area.innerHTML = '<div class="err"><b>Nothing was imported.</b> "' + esc(f.name) + '" has ' + parsed.errors.length + ' problem' + (parsed.errors.length === 1 ? '' : 's') + '; a file is taken whole or not at all.<ul>' +
+        shown.map(e => '<li>' + esc(e) + '</li>').join('') + (parsed.errors.length > 10 ? '<li>… and ' + (parsed.errors.length - 10) + ' more</li>' : '') + '</ul></div>';
+      return;
+    }
+    area.innerHTML = '<div class="card"><h3>Replace the log on this phone?</h3><p>"' + esc(f.name) + '" holds <b>' + parsed.rows.length + '</b> entr' + (parsed.rows.length === 1 ? 'y' : 'ies') + '. This phone holds <b>' + ST.log.length + '</b>. Replacing keeps the goal and can be undone until the next change.</p>' +
+      '<button class="btn" id="importGo" type="button">Replace with the file</button><button class="btn ghost" id="importCancel" type="button">Cancel</button></div>';
+    $('importCancel').onclick = () => { area.innerHTML = ''; };
+    $('importGo').onclick = () => {
+      S.importUndo = ST.log.slice();
+      ST.log = parsed.rows.map(r => Object.assign({ id: newId() }, r));
+      ST.lastId = null;
+      saveState(true);
+      renderGoal(); renderResult(); renderLog();
+      area.innerHTML = '<div class="ok">Imported ' + ST.log.length + ' entr' + (ST.log.length === 1 ? 'y' : 'ies') + ' from "' + esc(f.name) + '". <button class="btn small ghost" id="importUndoBtn" type="button">Undo import</button></div>';
+      $('importUndoBtn').onclick = () => {
+        if (!S.importUndo) { toast('The import can no longer be undone: the log changed since.'); area.innerHTML = ''; return; }
+        ST.log = S.importUndo; S.importUndo = null; ST.lastId = null; saveState();
+        renderGoal(); renderResult(); renderLog(); area.innerHTML = ''; toast('Import undone');
+      };
+      toast('Imported ' + ST.log.length + ' entries');
+    };
+  };
+
+  /* ---------- offline: the service worker caches the app's own files; a new version shows a reload banner ---------- */
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    const hadController = !!navigator.serviceWorker.controller; // only an update to an already-installed app earns the banner
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      const show = () => { if (hadController) $('updateBanner').hidden = false; };
+      if (reg.waiting) show();
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (nw) nw.addEventListener('statechange', () => { if (nw.state === 'installed') show(); });
+      });
+    }).catch(() => { /* offline cache unavailable; the app still works online */ });
+    $('reloadBtn').onclick = () => location.reload();
+    const offlineNote = () => { if (navigator.serviceWorker.controller) $('footer').textContent += ' · offline copy ready'; };
+    if (navigator.serviceWorker.controller) offlineNote(); else navigator.serviceWorker.addEventListener('controllerchange', offlineNote, { once: true });
+  }
+
+  renderGoal(); renderSelectors(); renderBuild(); renderLog(); renderBackup();
+})();
+</script>
+</body>
+</html>
