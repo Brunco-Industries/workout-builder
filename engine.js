@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.3.0'; // slice 3: export/import, offline cache, home screen, published
+  const APP_VERSION = '0.3.1'; // slice 3: export/import, offline cache, home screen, published
   const SPEC_VERSION = '1.3';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
