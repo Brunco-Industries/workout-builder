@@ -415,15 +415,10 @@
 
   /* ---------- offline: the service worker caches the app's own files; a new version shows a reload banner ---------- */
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    const hadController = !!navigator.serviceWorker.controller; // only an update to an already-installed app earns the banner
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      const show = () => { if (hadController) $('updateBanner').hidden = false; };
-      if (reg.waiting) show();
-      reg.addEventListener('updatefound', () => {
-        const nw = reg.installing;
-        if (nw) nw.addEventListener('statechange', () => { if (nw.state === 'installed') show(); });
-      });
-    }).catch(() => { /* offline cache unavailable; the app still works online */ });
+    const hadController = !!navigator.serviceWorker.controller; // true when an installed copy is already serving this page
+    navigator.serviceWorker.register('./sw.js').catch(() => { /* offline cache unavailable; the app still works online */ });
+    // The worker takes over as soon as it is installed; when that happens under an already-installed copy, a newer version is running and this page is stale.
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) $('updateBanner').hidden = false; });
     $('reloadBtn').onclick = () => location.reload();
     const offlineNote = () => { if (navigator.serviceWorker.controller) $('footer').textContent += ' · offline copy ready'; };
     if (navigator.serviceWorker.controller) offlineNote(); else navigator.serviceWorker.addEventListener('controllerchange', offlineNote, { once: true });
