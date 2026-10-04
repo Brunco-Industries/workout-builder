@@ -5,8 +5,8 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.3.4'; // Phase 4 fixes: banner hidden for real; worker precaches fresh bytes past the CDN
-  const SPEC_VERSION = '1.3';
+  const APP_VERSION = '0.4.0'; // Full gym benchmarked: elliptical, stair climber and sled join the machine ticks; two stair-climber rows
+  const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
   const TIMES = []; for (let t = 15; t <= 120; t += 5) TIMES.push(t);
@@ -17,8 +17,10 @@
     { key: 'kettlebell-only', code: 'KB', label: 'Kettlebell only' },
     { key: 'bodyweight-only', code: 'BW', label: 'Bodyweight only' }
   ];
-  const MACHINES = ['treadmill', 'bike', 'rower', 'elliptical'];
-  const DEFAULT_MACHINES = { 'full-gym': ['treadmill', 'bike', 'rower'], 'basic-gym': [] };
+  // Machine ticks for Full gym and Basic gym. Full gym starts with all of them, benchmarked against a large commercial club's published list (workout-rules.md §4).
+  const MACHINES = ['treadmill', 'bike', 'rower', 'elliptical', 'stairclimber', 'sled'];
+  const MACHINE_LABELS = { treadmill: 'Treadmill', bike: 'Bike', rower: 'Rower', elliptical: 'Elliptical', stairclimber: 'Stair climber', sled: 'Sled' };
+  const DEFAULT_MACHINES = { 'full-gym': MACHINES.slice(), 'basic-gym': [] };
   const FOCUS = [
     { key: 'upper', label: 'Upper body', short: 'upper-body' },
     { key: 'lower', label: 'Lower body', short: 'lower-body' },
@@ -531,7 +533,7 @@
   function workoutText(w) {
     const L = [];
     L.push(w.header.focus + ' · ' + w.header.type + (w.header.typeChanged ? ' (you chose ' + w.header.chosenType + ')' : '') + ' · ' + w.header.total + ' min');
-    L.push(w.header.equipment + (w.header.showsMachines ? (w.header.machines.length ? ' · machines: ' + w.header.machines.join(', ') : ' · no cardio machines ticked') : ''));
+    L.push(w.header.equipment + (w.header.showsMachines ? (w.header.machines.length ? ' · machines: ' + w.header.machines.map(m => (MACHINE_LABELS[m] || m).toLowerCase()).join(', ') : ' · no machines ticked') : ''));
     w.notes.forEach(n => L.push('Note: ' + n));
     L.push('Warm-up · ' + w.blocks.warmup + ' min');
     w.warmup.forEach(i => L.push('  ' + i.name + ' · ' + i.text));
@@ -585,7 +587,7 @@
   }
 
   root.Engine = {
-    APP_VERSION, SPEC_VERSION, TIMES, EQUIPMENT, MACHINES, DEFAULT_MACHINES, FOCUS, TYPES, STATUSES, LOG_FIELDS, SAFETY_LINE, TIMING, TIME_ZONE,
+    APP_VERSION, SPEC_VERSION, TIMES, EQUIPMENT, MACHINES, MACHINE_LABELS, DEFAULT_MACHINES, FOCUS, TYPES, STATUSES, LOG_FIELDS, SAFETY_LINE, TIMING, TIME_ZONE,
     parseCSV, csvField, parseLibrary, findRow, rowAllowed,
     blockMinutes, parseISO, isDate, addDays, mondayOf, dayIndex, todayIn, longDate,
     weeklyCount, lastTrained, focusCount,

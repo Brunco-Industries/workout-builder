@@ -1,6 +1,6 @@
 /* library.js: knowledge/exercise-library.csv embedded verbatim. Generated 2026-10-04 by .claude/build-library.sh; do not edit by hand. */
 window.EXERCISE_LIBRARY_CSV = `exercise,focus,types,needs,allowed_equipment,notes,pattern
-Easy cardio (any machine ticked),warmup,-,treadmill|bike|rower|elliptical,FG;BG,,cardio
+Easy cardio (any machine ticked),warmup,-,treadmill|bike|rower|elliptical|stairclimber,FG;BG,,cardio
 Easy rower,warmup,-,rower,FG;BG,,cardio
 Brisk walk or march in place,warmup,-,none,FG;BG;DB;KB;BW,,cardio
 Arm circles,warmup,-,none,FG;BG;DB;KB;BW,,mobility
@@ -89,13 +89,15 @@ Medicine-ball slam,core;total,power,medball,FG,,flex
 Fast dumbbell woodchop,core,power,db,FG;BG;DB,Nearest valid core-power option without a medicine ball,rotate
 Fast kettlebell woodchop,core,power,kb,FG;KB,Nearest valid core-power option without a medicine ball,rotate
 "Treadmill, bike or elliptical steady effort",cardio,endurance,treadmill|bike|elliptical,FG;BG,,cardio
+Stair climber steady climb,cardio,endurance,stairclimber,FG;BG,Added 2026-10-04 with the machine checklist; for Stephen's review,cardio
 Rower steady effort,cardio,endurance,rower,FG;BG,,cardio
 Outdoor run or brisk walk,cardio,endurance,none,FG;BG;DB;KB;BW,,cardio
 Treadmill steep incline walk,cardio,strength,treadmill,FG;BG,,cardio
 Bike heavy-resistance intervals,cardio,strength,bike,FG;BG,,cardio
 Elliptical heavy-resistance intervals,cardio,strength,elliptical,FG;BG,Added 2026-10-04 for the machine checklist; for Stephen's review,cardio
+Stair climber hard-climb intervals,cardio,strength,stairclimber,FG;BG,Added 2026-10-04 with the machine checklist; for Stephen's review,cardio
 Hill or stair climbing,cardio,strength,none,FG;BG;DB;KB;BW,,cardio
-Sled push or drag,cardio;total,strength,sled,FG,"Full gym only, if a sled is present",carry
+Sled push or drag,cardio;total,strength,sled,FG,Appears only when the sled is ticked,carry
 Bike sprints,cardio,power,bike,FG;BG,,cardio
 Elliptical sprints,cardio,power,elliptical,FG;BG,Added 2026-10-04 for the machine checklist; for Stephen's review,cardio
 Rower sprints,cardio,power,rower,FG;BG,,cardio

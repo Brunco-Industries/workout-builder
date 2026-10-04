@@ -103,7 +103,7 @@
   <p class="needs" id="needsLine">To build a workout the app needs: time, equipment, focus and type.</p>
   <div class="row"><span class="lbl">Time (minutes, includes warm-up and cool-down)</span><div class="chips scroll" id="timeChips"></div></div>
   <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div></div>
-  <div class="row" id="machineRow" hidden><span class="lbl">Cardio machines here (tick any)</span><div class="chips" id="machineChips"></div></div>
+  <div class="row" id="machineRow" hidden><span class="lbl">Machines here (tick any)</span><div class="chips" id="machineChips"></div></div>
   <div class="row"><span class="lbl">Focus</span><div class="chips" id="focusChips"></div></div>
   <div class="row"><span class="lbl">Type</span><div class="chips" id="typeChips"></div></div>
 
@@ -222,7 +222,7 @@
     chipRow('equipChips', E.EQUIPMENT.map(e => [e.key, e.label]), k => S.sel.equipment === k, k => { S.sel.equipment = k; S.sel.machines = (E.DEFAULT_MACHINES[k] || []).slice(); changed(); });
     const gym = S.sel.equipment in E.DEFAULT_MACHINES;
     $('machineRow').hidden = !gym;
-    if (gym) chipRow('machineChips', E.MACHINES.map(m => [m, m[0].toUpperCase() + m.slice(1)]), k => S.sel.machines.includes(k), k => {
+    if (gym) chipRow('machineChips', E.MACHINES.map(m => [m, E.MACHINE_LABELS[m]]), k => S.sel.machines.includes(k), k => {
       S.sel.machines = S.sel.machines.includes(k) ? S.sel.machines.filter(x => x !== k) : S.sel.machines.concat([k]); changed();
     });
     chipRow('focusChips', E.FOCUS.map(f => [f.key, f.label]), k => S.sel.focus === k, k => { S.sel.focus = k; changed(); });
@@ -261,7 +261,7 @@
     const mainItems = '<ol>' + w.main.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>';
     el.innerHTML = stale + '<div class="result' + (S.stale ? ' stale' : '') + '">' +
       '<p class="title">' + esc(w.header.focus) + ' · ' + esc(w.header.type) + (w.header.typeChanged ? ' <span class="sub">(you chose ' + esc(w.header.chosenType) + ')</span>' : '') + ' · ' + w.header.total + ' min</p>' +
-      '<p class="sub">' + esc(w.header.equipment) + (w.header.showsMachines ? (w.header.machines.length ? ' · machines: ' + esc(w.header.machines.join(', ')) : ' · no cardio machines ticked') : '') + '</p>' +
+      '<p class="sub">' + esc(w.header.equipment) + (w.header.showsMachines ? (w.header.machines.length ? ' · machines: ' + esc(w.header.machines.map(m => (E.MACHINE_LABELS[m] || m).toLowerCase()).join(', ')) : ' · no machines ticked') : '') + '</p>' +
       w.notes.map(n => '<div class="subst">' + esc(n) + '</div>').join('') +
       '<section class="block"><h4>Warm-up <span class="min">' + b.warmup + ' min</span></h4>' + list(w.warmup) + '</section>' +
       '<section class="block"><h4>Main block <span class="min">' + b.main + ' min</span></h4><p class="note">' + esc(w.main.intro) + '</p>' + mainItems +

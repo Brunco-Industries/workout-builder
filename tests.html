@@ -67,11 +67,17 @@
     const a = [E.lastTrained(log, 'upper', { before: TODAY }), E.lastTrained(log, 'upper')];
     return { actual: a.join('; '), pass: eq(a, ['2026-10-01', '2026-10-06']) };
   });
-  await check('U6', 'library: 102 rows, unique names, every row has a known pattern', '102 rows · 0 duplicate names · 0 unknown patterns', () => {
+  await check('U6', 'library: 104 rows, unique names, every row has a known pattern', '104 rows · 0 duplicate names · 0 unknown patterns', () => {
     const PATTERNS = ['push', 'pull', 'squat', 'hinge', 'lunge', 'jump', 'carry', 'brace', 'rotate', 'flex', 'isolation', 'cardio', 'mobility', 'stretch'];
     const seen = new Set(); let dup = 0, unknown = 0;
     lib.forEach(r => { if (seen.has(r.name)) dup++; seen.add(r.name); if (!PATTERNS.includes(r.pattern)) unknown++; });
-    return { actual: lib.length + ' rows · ' + dup + ' duplicate names · ' + unknown + ' unknown patterns', pass: lib.length === 102 && dup === 0 && unknown === 0 };
+    return { actual: lib.length + ' rows · ' + dup + ' duplicate names · ' + unknown + ' unknown patterns', pass: lib.length === 104 && dup === 0 && unknown === 0 };
+  });
+  await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
+    const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
+    const a = offered(['treadmill']), b = offered(['treadmill', 'sled', 'stairclimber']);
+    const ok = !a.includes('Sled push or drag') && !a.some(n => /^Stair climber/.test(n)) && b.includes('Sled push or drag') && b.some(n => /^Stair climber/.test(n));
+    return { actual: 'treadmill only: ' + a.join('|') + '; with sled + stair climber: ' + b.join('|'), pass: ok };
   });
   await check('U7', 'library.js is byte-identical to knowledge/exercise-library.csv', 'identical (when the file is reachable)', async () => {
     try {

@@ -3,7 +3,7 @@
    CACHE must change with Engine.APP_VERSION (tests.html checks they match) so a new version replaces the old one.
    At install, each file is fetched with a version stamp in the query string, so a CDN cannot hand back the previous
    version's bytes (GitHub Pages caches files for ten minutes); it is stored under its plain URL. */
-const CACHE = 'workout-builder-0.3.4';
+const CACHE = 'workout-builder-0.4.0';
 const VERSION = CACHE.replace('workout-builder-', '');
 const REQUIRED = ['./', './index.html', './engine.js', './library.js'];                       // without these there is no app offline
 const OPTIONAL = ['./manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png']; // nice to have; a blocked icon must not stop the install
