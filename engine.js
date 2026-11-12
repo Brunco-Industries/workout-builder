@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.3'; // C3: one ramp-up minute inside the main block before each barbell lift (decision 3)
+  const APP_VERSION = '0.6.4'; // C8: dates are the phone's local calendar day (decision 9)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -37,7 +37,7 @@
   const COUNTS_TOWARD_GOAL = { done: true, shortened: true, swapped: true };
   const LOG_FIELDS = ['date', 'week_start', 'time_selected_min', 'equipment', 'focus', 'type', 'status', 'actual_min', 'note'];
   const SAFETY_LINE = 'Stop if you feel sharp pain, and see a professional.';
-  const TIME_ZONE = 'America/Edmonton';
+  const TIME_ZONE = null; // decision 9 (2026-11-12): dates are the phone's local calendar day; 'America/Edmonton' was fixed here from 2026-10-04 to 2026-11-12
   const ROTATION_EPOCH = '2026-01-01';
 
   /* ---------- TIMING: every figure here is an ASSUMPTION (workout-rules.md §8) ---------- */
@@ -181,8 +181,12 @@
   function addDays(iso, n) { const d = parseISO(iso); d.setUTCDate(d.getUTCDate() + n); return fmtISO(d); }
   function mondayOf(iso) { const d = parseISO(iso); const dow = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - dow); return fmtISO(d); }
   function dayIndex(iso) { return Math.round((parseISO(iso) - parseISO(ROTATION_EPOCH)) / 86400000); }
+  /* Today's date. With no zone it is the phone's local calendar day (workout-rules.md §2, decision 9 of 2026-11-12); a named zone is
+     still honoured for callers that pass one. From 2026-10-04 to 2026-11-12 the app fixed America/Edmonton (TIME_ZONE) instead. */
   function todayIn(zone, now) {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone || TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now || new Date());
+    const d = now || new Date();
+    if (!zone) return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
     const get = t => parts.find(p => p.type === t).value;
     return get('year') + '-' + get('month') + '-' + get('day');
   }

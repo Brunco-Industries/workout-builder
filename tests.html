@@ -125,6 +125,12 @@
     return { actual: builds + ' builds; ' + bb + ' barbell lifts; ' + missing + ' without a ramp-up; ' + extra + ' non-barbell with one; ' + off + ' sums off; 60 · Full gym · Lower · Strength: ' + w.main.rounds + ' rounds × ' + w.main.roundMinutes + ' + ' + w.main.rampUpMinutes + ' ramp-up = ' + w.main.minutesUsed + ' of ' + w.blocks.main + ', ' + w.main.items[0].tag + ' ' + w.main.items[0].name + ' · ' + w.main.items[0].text,
       pass: bb > 0 && missing === 0 && extra === 0 && off === 0 };
   });
+  await check('U19', 'C8 local time: todayIn() with no zone is the phone\'s local calendar day: 23:30 local on 11 Oct → 11 Oct; 00:30 local on 12 Oct → 12 Oct; now → the local date by another route; TIME_ZONE no longer fixed', '2026-10-11 · 2026-10-12 · matches · TIME_ZONE null', () => {
+    const a = E.todayIn(null, new Date(2026, 9, 11, 23, 30)), b = E.todayIn(null, new Date(2026, 9, 12, 0, 30));
+    const n = new Date(), want = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    const same = E.todayIn() === want;
+    return { actual: a + ' · ' + b + ' · ' + (same ? 'matches' : E.todayIn() + ' ≠ ' + want) + ' · TIME_ZONE ' + String(E.TIME_ZONE), pass: a === '2026-10-11' && b === '2026-10-12' && same && E.TIME_ZONE === null };
+  });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
     const a = offered(['treadmill']), b = offered(['treadmill', 'sled', 'stairclimber']);
