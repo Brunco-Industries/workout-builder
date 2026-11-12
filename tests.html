@@ -79,7 +79,7 @@
     const tgu = w.main.items.find(i => /Turkish get-up/.test(i.name)), carry = w.main.items.find(i => /carry/.test(i.name));
     const mc = lib.find(r => r.name === 'Mountain climbers');
     return { actual: bad + ' invalid rows; get-up: ' + (tgu ? tgu.text : 'absent') + '; carry: ' + (carry ? carry.text : 'absent') + '; mountain climbers cooldown ' + (mc && mc.cooldownOk ? 'yes' : 'no'),
-      pass: bad === 0 && !!tgu && /3–6/.test(tgu.text) && !/20–30 s/.test(tgu.text) && !!carry && /about 40 m/.test(carry.text) && !!mc && !mc.cooldownOk };
+      pass: bad === 0 && !!tgu && /8–12/.test(tgu.text) && !/20–30 s/.test(tgu.text) && !!carry && /about 40 m/.test(carry.text) && !!mc && !mc.cooldownOk };
   });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
@@ -135,7 +135,7 @@
     const w = E.buildWorkout(lib, sel(15, 'bodyweight-only', 'core', 'endurance'), [], TODAY); const v = E.audit(w, lib);
     return { actual: [w.blocks.warmup, w.blocks.main, w.blocks.cooldown].join(' / ') + '; core ' + w.cooldown.core.minutes + '; violations: ' + (v.join('; ') || 'none'), pass: w.blocks.warmup === 3 && w.blocks.main === 9 && w.blocks.cooldown === 3 && w.cooldown.core.minutes >= 2 && v.length === 0 };
   });
-  await check('C2', '120 min · Full gym · Total · Strength', '10 / 100 / 10; ≥5 min core; A1/A2 pairs; 3–6 reps; audit clean', () => {
+  await check('C2', '120 min · Full gym · Total · Strength', '10 / 100 / 10; ≥5 min core; A1/A2 pairs; 8–12 reps; audit clean', () => {
     const w = E.buildWorkout(lib, sel(120, 'full-gym', 'total', 'strength'), [], TODAY); const v = E.audit(w, lib);
     const tags = w.main.items.map(i => i.tag).join(' ');
     return { actual: [w.blocks.warmup, w.blocks.main, w.blocks.cooldown].join(' / ') + '; core ' + w.cooldown.core.minutes + '; tags ' + tags + '; violations: ' + (v.join('; ') || 'none'), pass: w.blocks.main === 100 && w.cooldown.core.minutes >= 5 && /A1 A2/.test(tags) && v.length === 0 };

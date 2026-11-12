@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.5.7'; // B1, B2, B4, B5, B7: the library grows to 180 rows with load_class, dose, cooldown and cue; the engine reads them
+  const APP_VERSION = '0.6.0'; // C0: strength is 8–12 reps for every row (Stephen, 2026-11-12); phase C begins
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -43,7 +43,7 @@
   /* ---------- TIMING: every figure here is an ASSUMPTION (workout-rules.md §8) ---------- */
   const TIMING = {
     strength: { roundMinutes: 3, longRoundMinutes: 4, longMainFrom: 60, maxRoundsPerPair: 5,
-      reps: '3–6', hold: '20–30 s', effort: 'a weight you could lift 1–2 more times', effortBodyweight: 'the hardest variation you can do for 3–6 clean reps' },
+      reps: '8–12', hold: '20–30 s', effort: 'a weight you could lift 1–2 more times', effortBodyweight: 'the hardest variation you can do for 8–12 clean reps' }, // 8–12: Stephen, 2026-11-12 (workout-rules.md §5)
     power: { roundMinutes: 3, longRoundMinutes: 4, longMainFrom: 60, maxRoundsPerPair: 5,
       reps: '3–5 fast', jumps: '3–5 jumps', hold: '20–30 s', effort: 'light to moderate; move fast, and stop the set when speed drops', effortBodyweight: 'move fast, and stop the set when speed drops' },
     endurance: { stationSeconds: 45, changeSeconds: 15, roundRestSeconds: 60, minStations: 3, maxStations: 8, minRounds: 2, maxRounds: 12,
@@ -595,7 +595,7 @@
     if (w.text.indexOf(SAFETY_LINE) < 0) v.push('safety line missing');
     if (w.main.kind === 'pairs' && w.selections.type === 'strength' && !w.header.typeChanged) {
       if (!w.main.items.some(i => /^A1$/.test(i.tag)) || !w.main.items.some(i => /^A2$/.test(i.tag))) v.push('strength block has no A1/A2 pair');
-      w.main.items.forEach(i => { const row = findRow(library, i.name); if (row && row.types.includes('strength') && !/3–6|20–30 s|about 40 m/.test(i.text)) v.push('"' + i.name + '" is not dosed 3–6 reps, a hold or a distance'); });
+      w.main.items.forEach(i => { const row = findRow(library, i.name); if (row && row.types.includes('strength') && !/8–12|20–30 s|about 40 m/.test(i.text)) v.push('"' + i.name + '" is not dosed 8–12 reps, a hold or a distance'); });
     }
     return v;
   }
