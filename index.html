@@ -416,7 +416,8 @@
     }
     el.classList.add('sticky');
     el.innerHTML = '<div class="logwrap"><span class="lbl">Log this workout</span><div class="logbar">' +
-      '<button type="button" data-status="done">Done</button><button type="button" data-status="shortened">Shortened</button><button type="button" data-status="swapped">Swapped</button><button type="button" data-status="skipped">Skipped</button></div></div>';
+      '<button type="button" data-status="done">Done</button><button type="button" data-status="shortened">Shortened</button><button type="button" data-status="swapped">Swapped</button><button type="button" data-status="skipped">Skipped</button></div>' +
+      '<p class="hint" style="margin:6px 0 0">Done: as built. Shortened: the same focus and type in less time. Swapped: you trained a different focus or type. Skipped: you did not train, and it does not count.</p></div>';
     el.querySelectorAll('[data-status]').forEach(b => {
       b.onclick = () => { const st = b.getAttribute('data-status'); if (st === 'swapped') { S.swapping = true; renderLog(); return; } record(st, null); };
     });

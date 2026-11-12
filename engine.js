@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.5.4'; // A16: each equipment option is defined in one line under the chips
+  const APP_VERSION = '0.5.5'; // A17: the four log statuses are explained under the log bar
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
