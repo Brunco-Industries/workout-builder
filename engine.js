@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.9'; // A9: a workout done without a build can be logged from its own card (spec v1.6)
+  const APP_VERSION = '0.4.10'; // A10: the recorded card asks how the time went first, one tap
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

@@ -403,6 +403,7 @@
     const savedLine = () => 'Saved on this phone: ' + E.longDate(row.date) + ' · ' + row.time_selected_min + ' min · ' + eqLabel + '. Nothing was sent anywhere.';
     el.innerHTML = '<div class="recorded"><h3>Recorded · ' + esc(E.focusLabel(row.focus)) + ' · ' + esc(E.typeLabel(row.type)) + ' · ' + esc(row.status) + '</h3>' +
       '<p class="ok" id="recCount">' + counts + ' This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b>.</p>' +
+      '<div class="row" style="margin:8px 0 2px"><span class="lbl">How did the time go?</span><div class="chips" id="timeFeel"></div></div>' +
       '<p class="hint" id="recSaved" style="margin:8px 0 4px">' + esc(savedLine()) + '</p>' +
       '<details><summary class="hint">Show the saved row</summary><table class="rowtbl" id="rowTbl"></table></details>' +
       '<div class="field"><label for="dateIn" class="lbl">Date trained</label><input id="dateIn" type="date" value="' + esc(row.date) + '" max="' + esc(today()) + '"></div>' +
@@ -415,7 +416,13 @@
       $('recSaved').textContent = savedLine();
     };
     const refreshCount = () => { const c = E.weeklyCount(ST.log, today()); $('recCount').innerHTML = counts + ' This week: <b>' + c + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b>.'; };
-    tbl();
+    /* Minutes first, one tap. "About right" records the selected minutes as actual; the other two ask for the number. The chips reflect whatever number is recorded; a blank stays blank. */
+    const feelState = () => row.actual_min === '' ? null : (Number(row.actual_min) === Number(row.time_selected_min) ? 'right' : Number(row.actual_min) > Number(row.time_selected_min) ? 'over' : 'short');
+    const feel = () => chipRow('timeFeel', [['right', 'About right'], ['over', 'Ran over'], ['short', 'Cut short']], k => feelState() === k, k => {
+      if (k === 'right') { row.actual_min = Number(row.time_selected_min); $('minIn').value = row.actual_min; $('recErr').hidden = true; saveState(); tbl(); feel(); return; }
+      $('minIn').placeholder = k === 'over' ? 'how many minutes did it take?' : 'how many minutes did you do?'; $('minIn').focus(); feel();
+    });
+    tbl(); feel();
     $('dateIn').onchange = () => {
       const v = $('dateIn').value, e = $('recErr');
       if (!E.isDate(v) || v > today()) { e.hidden = false; e.textContent = 'The date must be a real day, today or earlier.'; $('dateIn').value = row.date; return; }
@@ -424,7 +431,7 @@
     $('minIn').oninput = () => {
       const v = $('minIn').value.trim(), e = $('recErr');
       if (v !== '' && (!/^\d+$/.test(v) || Number(v) < 1)) { e.hidden = false; e.textContent = 'Actual minutes must be a whole number of at least 1, or left blank.'; return; }
-      e.hidden = true; row.actual_min = v === '' ? '' : Number(v); saveState(); tbl();
+      e.hidden = true; row.actual_min = v === '' ? '' : Number(v); saveState(); tbl(); feel();
     };
     $('noteIn').oninput = () => { row.note = $('noteIn').value; saveState(); tbl(); };
     $('undoBtn').onclick = () => {
