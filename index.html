@@ -129,6 +129,7 @@
     <div id="resultArea"></div>
     <div id="logArea"></div>
   </div>
+  <div id="offlineLog"><button type="button" class="btn ghost small" id="offlineBtn">Did a workout without the app? Log it</button><div id="offlineCard"></div></div>
   </div>
 
   <div id="youView" hidden>
@@ -433,6 +434,43 @@
       renderGoal(); renderResult(); renderLog(); toast('Entry removed. Nothing is recorded for it.');
     };
   }
+
+  /* ---------- a workout done without a build (spec v1.6): logged from its own card, never on its own ---------- */
+  const O = { open: false, sel: { equipment: null, focus: null, type: null, time: null } };
+  const O_TIMES = [15, 30, 45, 60, 90, 120];
+  function renderOffline() {
+    const c = $('offlineCard'); $('offlineBtn').textContent = O.open ? 'Close' : 'Did a workout without the app? Log it';
+    if (!O.open) { c.innerHTML = ''; return; }
+    if (!c.querySelector('.card')) {
+      c.innerHTML = '<div class="card"><h3>A workout you did without the app</h3><p class="hint">Say what you did; it counts like any other entry, and its note will say it was logged without a build. Pick the nearest minutes; the exact minutes can go on the next card.</p>' +
+        '<div class="row"><span class="lbl">Minutes</span><div class="chips" id="oTime"></div></div>' +
+        '<div class="row"><span class="lbl">Equipment</span><div class="chips" id="oEquip"></div></div>' +
+        '<div class="row"><span class="lbl">Focus</span><div class="chips" id="oFocus"></div></div>' +
+        '<div class="row"><span class="lbl">Type</span><div class="chips" id="oType"></div></div>' +
+        '<div class="logbar" style="margin-top:8px;grid-template-columns:1fr 1fr"><button type="button" id="oDone">Log as done</button><button type="button" id="oShort">Log as shortened</button></div><p class="ferr" id="oErr" hidden></p></div>';
+    }
+    chipRow('oTime', O_TIMES.map(t => [t, String(t)]), k => O.sel.time === k, k => { O.sel.time = k; renderOffline(); });
+    chipRow('oEquip', E.EQUIPMENT.map(e => [e.key, e.label]), k => O.sel.equipment === k, k => { O.sel.equipment = k; renderOffline(); });
+    chipRow('oFocus', E.FOCUS.map(f => [f.key, f.label]), k => O.sel.focus === k, k => { O.sel.focus = k; renderOffline(); });
+    chipRow('oType', E.TYPES.map(t => [t.key, t.label]), k => O.sel.type === k, k => { O.sel.type = k; renderOffline(); });
+    const ready = O.sel.time !== null && !!O.sel.equipment && !!O.sel.focus && !!O.sel.type;
+    $('oDone').disabled = !ready; $('oShort').disabled = !ready;
+    $('oDone').onclick = () => recordOffline('done'); $('oShort').onclick = () => recordOffline('shortened');
+  }
+  function recordOffline(status) {
+    const d = today();
+    const row = { id: newId(), date: d, week_start: E.mondayOf(d), time_selected_min: O.sel.time, equipment: O.sel.equipment, focus: O.sel.focus, type: O.sel.type, status, actual_min: '', note: 'logged without a build' };
+    const errs = E.validateLogRow(row);
+    if (errs.length) { const e = $('oErr'); e.hidden = false; e.textContent = 'Not recorded: ' + errs[0]; return; }
+    ST.log.push(row); ST.lastId = row.id; O.open = false; S.result = null; S.stale = false; saveState();
+    renderOffline(); renderGoal(); renderResult(); renderLog();
+    const r = $('logArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('offlineBtn').onclick = () => {
+    O.open = !O.open;
+    if (O.open) O.sel = { equipment: S.sel.equipment, focus: S.sel.focus, type: S.sel.type, time: O_TIMES.includes(S.sel.time) ? S.sel.time : null }; // prefilled from the set-up, so a match is one tap
+    renderOffline();
+  };
 
   /* ---------- log backup: export and import in the training-log.csv format; nothing is sent anywhere ---------- */
   function renderBackup() {

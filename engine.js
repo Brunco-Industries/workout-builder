@@ -5,8 +5,8 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.8'; // A8: dark mode by the system setting
-  const SPEC_VERSION = '1.5';
+  const APP_VERSION = '0.4.9'; // A9: a workout done without a build can be logged from its own card (spec v1.6)
+  const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
   const TIMES = []; for (let t = 15; t <= 120; t += 5) TIMES.push(t);
