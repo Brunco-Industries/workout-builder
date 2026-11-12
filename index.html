@@ -119,7 +119,7 @@
   <div id="planArea">
   <p class="needs" id="needsLine">To build a workout the app needs: time, equipment, focus and type.</p>
   <div class="row"><span class="lbl">Time (minutes, includes warm-up and cool-down)</span><div class="timepick" id="timeChips"></div></div>
-  <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div><p class="hint" style="margin:6px 0 0">Bodyweight moves are included with every option.</p></div>
+  <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div><p class="hint" id="equipHint" style="margin:6px 0 0">Bodyweight moves are included with every option.</p></div>
   <div class="row" id="machineRow" hidden><span class="lbl">Machines here (tick any)</span><div class="chips" id="machineChips"></div></div>
   <div class="row"><span class="lbl">Focus</span><div class="chips" id="focusChips"></div></div>
   <div class="row"><span class="lbl">Type</span><div class="chips" id="typeChips"></div></div>
@@ -319,8 +319,17 @@
     c.querySelector('.val').textContent = t === null ? 'not set' : t + ' min';
     c.querySelectorAll('.quick .chip').forEach(b => { const q = Number(b.dataset.key); b.setAttribute('aria-pressed', t === q ? 'true' : 'false'); b.onclick = () => { S.sel.time = q; changed(); }; });
   }
+  /* What each option assumes, from workout-rules.md §4 ("Assumed available"). */
+  const EQUIP_HINT = {
+    'full-gym': 'Full gym: barbells and racks, dumbbells, benches, cables, machines, kettlebells, a pull-up bar, a plyo box and a medicine ball, plus the cardio machines you tick.',
+    'basic-gym': 'Basic gym: dumbbells and an adjustable bench, plus the cardio machines you tick. No barbells, racks or kettlebells.',
+    'dumbbells-only': 'Dumbbells only: a set of dumbbells and the floor, no bench.',
+    'kettlebell-only': 'Kettlebell only: one or more kettlebells and the floor.',
+    'bodyweight-only': 'Bodyweight only: the floor, a wall, stairs or a sturdy chair; outdoors, hills or stairs for cardio.'
+  };
   function renderSelectors() {
     renderTime();
+    $('equipHint').textContent = (S.sel.equipment && EQUIP_HINT[S.sel.equipment] ? EQUIP_HINT[S.sel.equipment] + ' ' : '') + 'Bodyweight moves are included with every option.';
     chipRow('equipChips', E.EQUIPMENT.map(e => [e.key, e.label]), k => S.sel.equipment === k, k => { S.sel.equipment = k; S.sel.machines = rememberedMachines(k); changed(); });
     const gym = S.sel.equipment in E.DEFAULT_MACHINES;
     $('machineRow').hidden = !gym;

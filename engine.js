@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.5.3'; // A15: the toast hides on time, on the next tap and on scroll
+  const APP_VERSION = '0.5.4'; // A16: each equipment option is defined in one line under the chips
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
