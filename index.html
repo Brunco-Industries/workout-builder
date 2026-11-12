@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Workout builder</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#1f5f3f">
+<meta name="theme-color" content="#1f5f3f" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121412" media="(prefers-color-scheme: dark)">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png" type="image/png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,7 +14,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Workout">
 <style>
-  :root{--bg:#f3f3ef;--card:#fff;--ink:#1c1c1a;--muted:#62665e;--line:#d8d8d1;--accent:#1f5f3f;--accent-ink:#fff;--chip:#e6efe8;--standin:#fff4cc;--standin-ink:#5b4300;--core:#eef3ff;--warn:#b3261e;--warn-bg:#fff0ee;--warn-line:#f1c9c4;--ok-bg:#e8f3ec}
+  :root{--bg:#f3f3ef;--card:#fff;--ink:#1c1c1a;--muted:#62665e;--line:#d8d8d1;--accent:#1f5f3f;--accent-ink:#fff;--chip:#e6efe8;--standin:#fff4cc;--standin-ink:#5b4300;--core:#eef3ff;--warn:#b3261e;--warn-bg:#fff0ee;--warn-line:#f1c9c4;--ok-bg:#e8f3ec;--note-line:#e3c96a;--disabled-bg:#c9d3cc;--disabled-ink:#3b4a40;--toast-bg:#222;--toast-ink:#fff;color-scheme:light}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#121412;--card:#1d201d;--ink:#ecece7;--muted:#a9aea5;--line:#363a36;--accent:#2e7a52;--accent-ink:#fff;--chip:#253129;--standin:#3a3110;--standin-ink:#f3dd8a;--core:#1c2434;--warn:#ff9a8f;--warn-bg:#3a1f1c;--warn-line:#6a3530;--ok-bg:#1e3327;--note-line:#7a6a2a;--disabled-bg:#3a403c;--disabled-ink:#c8cfc9;--toast-bg:#e8e8e3;--toast-ink:#111;color-scheme:dark}
+  }
   *{box-sizing:border-box}
   [hidden]{display:none !important} /* the hidden attribute wins over any display rule below (the update banner is display:flex) */
   html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
@@ -35,12 +39,12 @@
   .timepick .val{min-width:96px;text-align:center;font-weight:700;font-size:1.15rem}
   .timepick .quick{display:flex;flex-wrap:wrap;gap:6px;width:100%;margin-top:4px}
   .btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:700;background:var(--accent);color:var(--accent-ink);margin:10px 0 4px}
-  .btn[disabled]{background:#c9d3cc;color:#3b4a40}
+  .btn[disabled]{background:var(--disabled-bg);color:var(--disabled-ink)}
   .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
   .btn.small{width:auto;display:inline-block;padding:8px 12px;margin:4px 6px 0 0;font-size:.9rem}
   .needs,.hint{font-size:.86rem;color:var(--muted);margin:0 0 6px}
   .err{color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:10px;padding:8px 10px;margin:8px 0;font-size:.92rem}
-  .banner{background:var(--standin);color:var(--standin-ink);border:1px solid #e3c96a;border-radius:10px;padding:8px 12px;font-size:.86rem;margin:0 0 10px}
+  .banner{background:var(--standin);color:var(--standin-ink);border:1px solid var(--note-line);border-radius:10px;padding:8px 12px;font-size:.86rem;margin:0 0 10px}
   /* goal strip */
   .goal{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
   .goal .lbl{display:block;margin:0}
@@ -52,14 +56,14 @@
   .card h3{margin:0 0 6px;font-size:1rem}
   .field{display:flex;gap:8px;align-items:center;margin:6px 0}
   .field label{margin:0;min-width:92px}
-  .field input{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);width:100%;background:#fff;min-height:40px}
+  .field input{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);width:100%;background:var(--card);color:var(--ink);min-height:40px}
   .field input[type=number]{max-width:130px}
   .ferr{color:var(--warn);font-size:.86rem;margin:4px 0 0}
   .ok{background:var(--ok-bg);border-radius:8px;padding:6px 10px;font-size:.9rem}
   /* result */
   .result{margin-top:12px}
   .result.stale{opacity:.55}
-  .stale-note,.subst{background:var(--standin);color:var(--standin-ink);border:1px solid #e3c96a;border-radius:10px;padding:8px 10px;font-size:.92rem;margin:6px 0}
+  .stale-note,.subst{background:var(--standin);color:var(--standin-ink);border:1px solid var(--note-line);border-radius:10px;padding:8px 10px;font-size:.92rem;margin:6px 0}
   .title{font-weight:700;font-size:1.1rem;margin:0}
   .sub{color:var(--muted);font-size:.9rem;margin:0 0 6px}
   .block{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
@@ -67,7 +71,7 @@
   .block h5{font-size:.95rem}
   .min{color:var(--accent);font-weight:700}
   .block ul,.block ol{margin:0;padding-left:1.1rem}
-  .block li{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed #ebebe6}
+  .block li{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line)}
   .block li:last-child{border-bottom:0}
   .block ul li>span:last-child{white-space:nowrap}
   .block ol li{display:block}
@@ -95,8 +99,8 @@
   .backup summary{cursor:pointer;color:var(--muted);font-size:.86rem}
   .backup ul{margin:6px 0 0;padding-left:1.1rem;font-size:.86rem;color:var(--warn)}
   .update{display:flex;justify-content:space-between;align-items:center;gap:8px}
-  .update button{font:inherit;font-size:.86rem;font-weight:700;border:1px solid #e3c96a;background:#fff;border-radius:8px;padding:6px 10px}
-  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 14px;border-radius:10px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+  .update button{font:inherit;font-size:.86rem;font-weight:700;border:1px solid var(--note-line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 10px}
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-ink);padding:10px 14px;border-radius:10px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
   .toast.show{opacity:1}
   .footer{color:var(--muted);font-size:.8rem;margin-top:20px}
 </style>

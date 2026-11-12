@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.7'; // A7: chips and the time stepper update in place, so keyboard focus survives a tap
+  const APP_VERSION = '0.4.8'; // A8: dark mode by the system setting
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
