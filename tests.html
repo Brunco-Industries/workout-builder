@@ -82,18 +82,21 @@
       pass: bad === 0 && !!tgu && /8–12/.test(tgu.text) && !/20–30 s/.test(tgu.text) && !!carry && /about 40 m/.test(carry.text) && !!mc && !mc.cooldownOk };
   });
   await check('U15', 'C2 rest and rounds: strength is 4-min rounds with 90 s rests at 15, 30, 45, 60 and 120 min; power keeps 3 min / 60 s under a 60-min main block and 4 min / 90 s from 60', 'strength 4/90 at every length; power 3/60 at 45, 4/90 at 90', () => {
-    const s = [15, 30, 45, 60, 120].map(t => { const w = E.buildWorkout(lib, sel(t, 'full-gym', 'lower', 'strength'), [], TODAY); return w.main.roundMinutes + '/' + (w.main.items.every(i => / rest 90 s$/.test(i.text)) ? '90' : 'not 90'); });
+    const sg = w => w.main.segments[0]; // the first segment carries the selected type
+    const s = [15, 30, 45, 60, 120].map(t => { const w = E.buildWorkout(lib, sel(t, 'full-gym', 'lower', 'strength'), [], TODAY); return sg(w).roundMinutes + '/' + (sg(w).items.every(i => / rest 90 s$/.test(i.text)) ? '90' : 'not 90'); });
     const p45 = E.buildWorkout(lib, sel(45, 'full-gym', 'lower', 'power'), [], TODAY), p90 = E.buildWorkout(lib, sel(90, 'full-gym', 'lower', 'power'), [], TODAY);
-    const p = [p45, p90].map(w => w.main.roundMinutes + '/' + (w.main.items.every(i => / rest (60|90) s$/.test(i.text)) ? i2(w) : 'mixed'));
-    function i2(w) { return (/ rest 60 s$/.test(w.main.items[0].text) ? '60' : '90'); }
+    const p = [p45, p90].map(w => sg(w).roundMinutes + '/' + (sg(w).items.every(i => / rest (60|90) s$/.test(i.text)) ? i2(w) : 'mixed'));
+    function i2(w) { return (/ rest 60 s$/.test(sg(w).items[0].text) ? '60' : '90'); }
     return { actual: 'strength ' + s.join(' · ') + '; power ' + p.join(' · '), pass: s.every(x => x === '4/90') && p[0] === '3/60' && p[1] === '4/90' };
   });
   await check('U16', 'C2 pairing exclusions: no pair holds two barbell lifts or two whole-body compound lifts (every Full gym strength and power build, every time, every focus); canPair refuses the pairs the rule names', 'pairs examined > 0; 0 two-barbell; 0 two-whole-body; 6 whole-body rows; canPair: squat+deadlift no, squat+goblet yes, thruster+clean-and-press no', () => {
     let pairs = 0, bb = 0, wb = 0;
     E.TIMES.forEach(t => ['upper', 'lower', 'total', 'core'].forEach(f => ['strength', 'power'].forEach(ty => {
-      const w = E.buildWorkout(lib, sel(t, 'full-gym', f, ty), [], TODAY); if (w.main.kind !== 'pairs') return;
-      const by = {}; w.main.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (by[m[1]] = by[m[1]] || [])[+m[2] - 1] = E.findRow(lib, i.name); });
-      Object.keys(by).forEach(L => { const a = by[L][0], b = by[L][1]; if (!a || !b) return; pairs++; if (a.loadClass === 'barbell' && b.loadClass === 'barbell') bb++; if (E.wholeBodyLift(a) && E.wholeBodyLift(b)) wb++; });
+      const w = E.buildWorkout(lib, sel(t, 'full-gym', f, ty), [], TODAY);
+      w.main.segments.filter(s => s.kind === 'pairs').forEach(s => {
+        const by = {}; s.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (by[m[1]] = by[m[1]] || [])[+m[2] - 1] = E.findRow(lib, i.name); });
+        Object.keys(by).forEach(L => { const a = by[L][0], b = by[L][1]; if (!a || !b) return; pairs++; if (a.loadClass === 'barbell' && b.loadClass === 'barbell') bb++; if (E.wholeBodyLift(a) && E.wholeBodyLift(b)) wb++; });
+      });
     })));
     const whole = lib.filter(E.wholeBodyLift).map(r => r.name);
     const R = n => E.findRow(lib, n);
@@ -104,25 +107,30 @@
   await check('U17', 'C1 order by load class: in every Full gym, Basic gym and Dumbbells strength and power build the pairs run barbell, then weights, then bodyweight, and inside a pair the heavier row is A1', 'pairs examined > 0; 0 out of order (the sample shows the classes in order)', () => {
     let pairs = 0, bad = 0;
     E.TIMES.forEach(t => ['full-gym', 'basic-gym', 'dumbbells-only'].forEach(e => ['upper', 'lower', 'total', 'core'].forEach(f => ['strength', 'power'].forEach(ty => {
-      const w = E.buildWorkout(lib, sel(t, e, f, ty), [], TODAY); if (w.main.kind !== 'pairs') return;
-      const by = {}; w.main.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (by[m[1]] = by[m[1]] || [])[+m[2] - 1] = E.findRow(lib, i.name); });
-      let prev = -1;
-      Object.keys(by).sort().forEach(L => { const a = by[L][0], b = by[L][1]; if (!a || !b) return; pairs++; if (E.loadRank(a) > E.loadRank(b) || E.loadRank(a) < prev) bad++; prev = E.loadRank(a); });
+      const w = E.buildWorkout(lib, sel(t, e, f, ty), [], TODAY);
+      w.main.segments.filter(s => s.kind === 'pairs').forEach(s => {
+        const by = {}; s.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (by[m[1]] = by[m[1]] || [])[+m[2] - 1] = E.findRow(lib, i.name); });
+        let prev = -1;
+        Object.keys(by).sort().forEach(L => { const a = by[L][0], b = by[L][1]; if (!a || !b) return; pairs++; if (E.loadRank(a) > E.loadRank(b) || E.loadRank(a) < prev) bad++; prev = E.loadRank(a); });
+      });
     }))));
     const w = E.buildWorkout(lib, sel(90, 'full-gym', 'lower', 'strength'), [], TODAY);
-    const seq = w.main.items.map(i => i.tag + ':' + E.findRow(lib, i.name).loadClass).join(' ');
+    const seq = w.main.segments[0].items.map(i => i.tag + ':' + E.findRow(lib, i.name).loadClass).join(' ');
     return { actual: pairs + ' pairs; ' + bad + ' out of order; sample 90 · Full gym · Lower · Strength: ' + seq, pass: pairs > 0 && bad === 0 };
   });
   await check('U18', 'C3 ramp-up: in every Full gym strength and power build each barbell lift carries "1 min ramp-up, then", no other row does, and rounds × round length + ramp-up minutes = the minutes used, inside the main block', 'barbell lifts > 0; 0 without a ramp-up; 0 non-barbell with one; 0 sums off', () => {
     let bb = 0, missing = 0, extra = 0, off = 0, builds = 0;
     E.TIMES.forEach(t => ['upper', 'lower', 'total', 'core'].forEach(f => ['strength', 'power'].forEach(ty => {
-      const w = E.buildWorkout(lib, sel(t, 'full-gym', f, ty), [], TODAY); if (w.main.kind !== 'pairs') return; builds++;
-      let k = 0;
-      w.main.items.forEach(i => { if (!i.tag) return; const isBB = E.findRow(lib, i.name).loadClass === 'barbell', has = /^1 min ramp-up, then /.test(i.text); if (isBB) { bb++; k++; if (!has) missing++; } else if (has) extra++; });
-      if (w.main.rounds * w.main.roundMinutes + k !== w.main.minutesUsed || w.main.minutesUsed + w.main.remainder !== w.blocks.main || w.main.rampUpMinutes !== k) off++;
+      const w = E.buildWorkout(lib, sel(t, 'full-gym', f, ty), [], TODAY);
+      if (w.main.minutesUsed + w.main.remainder !== w.blocks.main) off++;
+      w.main.segments.filter(s => s.kind === 'pairs').forEach(s => {
+        builds++; let k = 0;
+        s.items.forEach(i => { if (!i.tag) return; const isBB = E.findRow(lib, i.name).loadClass === 'barbell', has = /^1 min ramp-up, then /.test(i.text); if (isBB) { bb++; k++; if (!has) missing++; } else if (has) extra++; });
+        if (s.rounds * s.roundMinutes + k !== s.minutesUsed || s.rampUpMinutes !== k) off++;
+      });
     })));
-    const w = E.buildWorkout(lib, sel(60, 'full-gym', 'lower', 'strength'), [], TODAY);
-    return { actual: builds + ' builds; ' + bb + ' barbell lifts; ' + missing + ' without a ramp-up; ' + extra + ' non-barbell with one; ' + off + ' sums off; 60 · Full gym · Lower · Strength: ' + w.main.rounds + ' rounds × ' + w.main.roundMinutes + ' + ' + w.main.rampUpMinutes + ' ramp-up = ' + w.main.minutesUsed + ' of ' + w.blocks.main + ', ' + w.main.items[0].tag + ' ' + w.main.items[0].name + ' · ' + w.main.items[0].text,
+    const w = E.buildWorkout(lib, sel(60, 'full-gym', 'lower', 'strength'), [], TODAY), s0 = w.main.segments[0];
+    return { actual: builds + ' pairs segments; ' + bb + ' barbell lifts; ' + missing + ' without a ramp-up; ' + extra + ' non-barbell with one; ' + off + ' sums off; 60 · Full gym · Lower · Strength: ' + s0.rounds + ' rounds × ' + s0.roundMinutes + ' + ' + s0.rampUpMinutes + ' ramp-up = ' + s0.minutesUsed + ' of ' + w.blocks.main + ', ' + s0.items[0].tag + ' ' + s0.items[0].name + ' · ' + s0.items[0].text,
       pass: bb > 0 && missing === 0 && extra === 0 && off === 0 };
   });
   await check('U19', 'C8 local time: todayIn() with no zone is the phone\'s local calendar day: 23:30 local on 11 Oct → 11 Oct; 00:30 local on 12 Oct → 12 Oct; now → the local date by another route; TIME_ZONE no longer fixed', '2026-10-11 · 2026-10-12 · matches · TIME_ZONE null', () => {
@@ -130,6 +138,19 @@
     const n = new Date(), want = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
     const same = E.todayIn() === want;
     return { actual: a + ' · ' + b + ' · ' + (same ? 'matches' : E.todayIn() + ' ≠ ' + want) + ' · TIME_ZONE ' + String(E.TIME_ZONE), pass: a === '2026-10-11' && b === '2026-10-12' && same && E.TIME_ZONE === null };
+  });
+  await check('U20', 'C4 caps and fill: in every default build no pair has more than 5 rounds and no circuit more than 4; when a type\'s rows run out the block continues with the next type and the header names the mix; no "rounds per pair above" note remains', 'over 5: 0; over 4: 0; mixed builds > 0, none without ", then " in the header; 0 old notes; two samples described', () => {
+    let over5 = 0, over4 = 0, mixed = 0, noHeader = 0, oldNote = 0, n = 0, firstMixed = '';
+    const desc = w => w.header.focus + ' · ' + w.header.type + ' [' + w.main.segments.map(s => s.kind + ' ' + s.minutesUsed + ' min' + (s.kind === 'circuit' ? ' (' + s.stations + '×' + s.rounds + ')' : ' (' + s.items.length + ' rows)')).join(' + ') + (w.main.remainder ? ' + ' + w.main.remainder + ' over' : '') + ']';
+    E.TIMES.forEach(t => E.EQUIPMENT.forEach(e => E.FOCUS.forEach(f => E.TYPES.forEach(ty => {
+      const w = E.buildWorkout(lib, sel(t, e.key, f.key, ty.key), [], TODAY); n++;
+      w.main.segments.forEach(s => { if (s.kind === 'pairs') s.items.forEach(i => { if (i.sets > 5) over5++; }); if (s.kind === 'circuit' && s.rounds > 4) over4++; });
+      if (w.main.types.length > 1) { mixed++; if (!/, then /.test(w.header.type)) noHeader++; if (!firstMixed) firstMixed = t + ' · ' + e.key + ': ' + desc(w); }
+      if (w.notes.some(x => /Rounds per pair above/.test(x))) oldNote++;
+    }))));
+    const c = E.buildWorkout(lib, sel(90, 'full-gym', 'upper', 'endurance'), [], TODAY);
+    return { actual: n + ' builds; over 5: ' + over5 + '; over 4: ' + over4 + '; mixed: ' + mixed + ' (' + noHeader + ' without a mixed header); old notes: ' + oldNote + '; first mixed: ' + firstMixed + '; 90 · Full gym · Upper · Endurance: ' + desc(c),
+      pass: over5 === 0 && over4 === 0 && mixed > 0 && noHeader === 0 && oldNote === 0 };
   });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };

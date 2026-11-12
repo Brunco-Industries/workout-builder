@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.4'; // C8: dates are the phone's local calendar day (decision 9)
+  const APP_VERSION = '0.6.5'; // C4: caps (5 rounds per pair, 4 per circuit) and the fill with the next type; the main block as segments (decision 4)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -46,7 +46,7 @@
       reps: '8–12', hold: '20–30 s', effort: 'a weight you could lift 1–2 more times', effortBodyweight: 'the hardest variation you can do for 8–12 clean reps' }, // 8–12: Stephen, 2026-11-12 (workout-rules.md §5)
     power: { roundMinutes: 3, restSeconds: 60, longRoundMinutes: 4, longRestSeconds: 90, longMainFrom: 60, maxRoundsPerPair: 5,
       reps: '3–5 fast', jumps: '3–5 jumps', hold: '20–30 s', effort: 'light to moderate; move fast, and stop the set when speed drops', effortBodyweight: 'move fast, and stop the set when speed drops' },
-    endurance: { stationSeconds: 45, changeSeconds: 15, roundRestSeconds: 60, minStations: 3, maxStations: 8, minRounds: 2, maxRounds: 12,
+    endurance: { stationSeconds: 45, changeSeconds: 15, roundRestSeconds: 60, minStations: 3, maxStations: 8, minRounds: 2, maxRounds: 4, // at most 4 rounds per circuit: decision 4 (2026-11-12); 12 before
       reps: '12–20', effort: 'a weight you could lift 5+ more times; steady pace, strict form', effortBodyweight: 'steady pace, strict form' },
     cardio: { strengthHardMin: 2, strengthEasyMin: 1, powerOnSec: 20, powerOffSec: 100,
       effort: { endurance: 'a pace where you can speak in short sentences', strength: 'high resistance or a steep grade; hard but controlled', power: 'all-out on the work, fully easy on the recovery' } },
@@ -302,17 +302,13 @@
     return { base, pool, notes, deliveredType };
   }
 
-  /* Decision 2: when a pool is smaller than the block needs, extend it in a fixed order.
-     Total body keeps the chosen type as long as it can (upper- and lower-body rows of the same type first). */
+  /* §4 nearest-valid for Total body: when its pool is smaller than the block needs, add upper- and lower-body rows of the same type.
+     Rows of other types no longer join the same block: since 0.6.5 (decision 4) the rest of the block is filled with the next type as its own segment. */
   function extendPool(ctx, pool, needed, sessionType) {
-    if (pool.length >= needed) return pool;
-    const before = pool.length, what = [];
-    const tryAdd = (rows, label) => { if (pool.length >= needed) return; if (addRows(pool, rows).length) what.push(label); };
-    if (ctx.sel.focus === 'total') tryAdd(upperLowerRows(ctx.library, ctx.sel, sessionType), 'upper- and lower-body ' + sessionType);
-    if (sessionType !== 'endurance') tryAdd(poolFor(ctx.library, ctx.sel, ctx.sel.focus, 'endurance'), focusShort(ctx.sel.focus) + ' endurance');
-    TYPES.forEach(t => { if (t.key !== sessionType && t.key !== 'endurance') tryAdd(poolFor(ctx.library, ctx.sel, ctx.sel.focus, t.key), focusShort(ctx.sel.focus) + ' ' + t.key); });
-    if (ctx.sel.focus === 'total') tryAdd(upperLowerRows(ctx.library, ctx.sel, null), 'upper- and lower-body');
-    if (pool.length > before) ctx.notes.push('Only ' + before + ' exercises fit ' + selectionText(ctx.sel) + '; added ' + what.join(', then ') + ' work to fill the block.');
+    if (pool.length >= needed || ctx.sel.focus !== 'total') return pool;
+    const before = pool.length;
+    const added = addRows(pool, upperLowerRows(ctx.library, ctx.sel, sessionType).filter(r => !(ctx.usedMain && ctx.usedMain.has(r.name))));
+    if (added.length) ctx.notes.push('Only ' + before + ' exercises fit ' + selectionText(ctx.sel) + '; added upper- and lower-body ' + sessionType + ' work to fill the block.');
     return pool;
   }
 
@@ -390,12 +386,16 @@
   }
 
   /* ---------- main block: strength and power as paired rounds ---------- */
-  function pairsBlock(ctx, pool, main, type) {
+  function pairsBlock(ctx, pool, main, type, minRounds) {
     const cfg = TIMING[type];
-    const long = cfg.longMainFrom != null && main >= cfg.longMainFrom;
+    const noteMark = ctx.notes.length;
+    const bail = () => { ctx.notes.length = noteMark; return null; }; // nothing fits: the caller moves on, and no note is left behind
+    const minR = minRounds || 1; // a fill segment needs 2 rounds (a team figure, workout-rules.md §8 the fill); the first segment 1
+    const long = cfg.longMainFrom != null && (ctx.mainMinutes || main) >= cfg.longMainFrom; // the whole main block decides, not the segment's share
     const roundLen = long ? cfg.longRoundMinutes : cfg.roundMinutes;
     const rest = (long ? cfg.longRestSeconds : cfg.restSeconds) + ' s';
     let R = Math.floor(main / roundLen);
+    if (R < minR || !pool.length) return bail();
     const P0 = Math.ceil(R / cfg.maxRoundsPerPair);
     const base = pool.slice();
     pool = extendPool(ctx, pool.slice(), 2 * P0, type);
@@ -405,7 +405,7 @@
     let roundsPerPair = [];
     let pairs = maxPairs < 1 ? [] : orderByLoad(formPairs(ordered, P0));
     const single = pairs.length ? null : ordered[0];
-    if (!pairs.length && !single) throw new Error('No exercise fits ' + selectionText(ctx.sel) + '.');
+    if (!pairs.length && !single) return bail();
     /* Ramp-up (workout-rules.md §8, decision 3 of 2026-11-12): one minute inside the block before each barbell lift's first set, taken
        from the block's minutes. Fewer minutes can mean fewer rounds and so one pair fewer, dropped from the lighter end; the count settles. */
     const rowsOf = () => single ? [single] : pairs.reduce((a, pr) => a.concat(pr.a1, pr.a2), []);
@@ -417,32 +417,38 @@
       if (!single && need < pairs.length) { pairs = pairs.slice(0, need); ramp = rampOf(); continue; }
       break;
     }
+    if (R < minR) return bail();
+    /* Caps (workout-rules.md §8, decision 4 of 2026-11-12): at most maxRoundsPerPair rounds per pair, or per exercise in straight sets;
+       the rounds these rows cannot hold pass to the next segment of the block. */
+    const cap = cfg.maxRoundsPerPair * (single ? 1 : pairs.length);
+    const capped = R > cap;
+    if (capped) R = cap;
     const rampText = row => row.loadClass === 'barbell' ? '1 min ramp-up, then ' : '';
+    const withSets = (it, n) => { it.sets = n; return it; };
     if (single) {
-      items.push(item('1', single, rampText(single) + prescribe(single, type, R, rest)));
+      items.push(withSets(item('1', single, rampText(single) + prescribe(single, type, R, rest)), R));
       roundsPerPair = [R];
-      ctx.notes.push(maxPairs < 1 ? 'Only one exercise fits this selection: straight sets instead of pairs.'
+      ctx.notes.push(maxPairs < 1 ? (minR > 1 ? 'One ' + typeLabel(type).toLowerCase() + ' exercise is left for this part of the block: straight sets instead of pairs.' : 'Only one exercise fits this selection: straight sets instead of pairs.')
         : 'No two of the exercises that fit this selection may share a pair (two barbell lifts, or two whole-body lifts): straight sets instead of pairs.');
     } else {
-      const need = Math.ceil(R / cfg.maxRoundsPerPair), P = pairs.length;
-      if (need > P) ctx.notes.push('Rounds per pair above ' + cfg.maxRoundsPerPair + ': only ' + (maxPairs < need ? pool.length + ' exercises fit this selection.' : P + ' pair' + (P === 1 ? '' : 's') + ' can be formed under the pairing rules.'));
+      const P = pairs.length;
       const base = Math.floor(R / P), extra = R % P;
       pairs.forEach((pr, p) => {
         const rounds = base + (p < extra ? 1 : 0), L = String.fromCharCode(65 + p);
         if (pr.samePattern) ctx.notes.push('Pair ' + L + ': both exercises are ' + pr.a1.pattern + ' movements; no other pattern fits this selection.');
-        items.push(item(L + '1', pr.a1, rampText(pr.a1) + prescribe(pr.a1, type, rounds, rest)), item(L + '2', pr.a2, rampText(pr.a2) + prescribe(pr.a2, type, rounds, rest)));
+        items.push(withSets(item(L + '1', pr.a1, rampText(pr.a1) + prescribe(pr.a1, type, rounds, rest)), rounds),
+          withSets(item(L + '2', pr.a2, rampText(pr.a2) + prescribe(pr.a2, type, rounds, rest)), rounds));
         roundsPerPair.push(rounds);
       });
     }
     const minutesUsed = R * roundLen + ramp;
-    const remainder = main - minutesUsed;
     const lo = Math.min.apply(null, roundsPerPair), hi = Math.max.apply(null, roundsPerPair);
     const effort = effortFor(ctx.sel, type);
-    const intro = typeLabel(type) + ': ' + (type === 'strength' ? cfg.reps + ' reps, ' + effort : cfg.reps + ' reps, ' + effort) +
-      '. A1, rest, A2, rest; ' + (lo === hi ? lo : lo + '–' + hi) + ' rounds per pair, about ' + roundLen + ' min a round.' +
+    const intro = typeLabel(type) + ': ' + cfg.reps + ' reps, ' + effort + '. ' +
+      (single ? 'Straight sets; ' + R + ' sets' : 'A1, rest, A2, rest; ' + (lo === hi ? lo : lo + '–' + hi) + ' rounds per pair') + ', about ' + roundLen + ' min a round.' +
       (ramp ? ' Each barbell lift starts with a 1-minute ramp-up.' : '');
-    return { kind: 'pairs', roundMinutes: roundLen, rounds: R, pairs: items.length / 2, items, remainder, minutesUsed, rampUpMinutes: ramp,
-      intro, tail: remainder ? 'Set-up and change-over · ' + remainder + ' min' : '', used: items.map(i => i.name) };
+    return { kind: 'pairs', type, roundMinutes: roundLen, rounds: R, pairs: single ? 0 : items.length / 2, items, remainder: 0, minutesUsed, rampUpMinutes: ramp, capped,
+      intro, tail: '', used: items.map(i => i.name) };
   }
 
   /* ---------- main block: endurance as a circuit ---------- */
@@ -462,12 +468,16 @@
   }
   function circuitBlock(ctx, pool, main, reserve) {
     const c = TIMING.endurance;
+    const noteMark = ctx.notes.length;
+    const bail = () => { ctx.notes.length = noteMark; return null; }; // nothing fits: the caller moves on, and no note is left behind
     let pick = chooseCircuit(main, c.maxStations);
+    if (!pick || !pool.length) return bail(); // not even the smallest circuit fits, or no rows
     const base = pool.slice();
     pool = extendPool(ctx, pool.slice(), pick.S + reserve, 'endurance');
     let maxS = Math.min(c.maxStations, pool.length - reserve);
     if (maxS < c.minStations) maxS = Math.min(c.maxStations, Math.max(1, pool.length)); // the cool-down core may then repeat, and says so
     pick = chooseCircuit(main, maxS);
+    if (!pick) return bail();
     const rot = makeRotation(orderedPool(base, pool, ctx.start), 0);
     const items = [];
     let prev = null;
@@ -477,11 +487,11 @@
       items.push(item(String(s + 1), row, pick.N + ' × ' + c.stationSeconds + ' s' + (row.perSide ? ', switch sides halfway' : '')));
       prev = row;
     }
-    const remainder = main - pick.N * (pick.S + 1);
+    if (items.length < pick.S) return bail(); // never a station without a row
     const intro = 'Endurance circuit: ' + c.stationSeconds + ' s work, ' + c.changeSeconds + ' s change-over, ' + c.roundRestSeconds + ' s rest after each round. ' +
       pick.S + ' station' + (pick.S === 1 ? '' : 's') + ' × ' + pick.N + ' rounds. Effort: ' + effortFor(ctx.sel, 'endurance') + '.';
-    return { kind: 'circuit', stations: pick.S, rounds: pick.N, items, remainder, minutesUsed: pick.N * (pick.S + 1),
-      intro, tail: remainder ? 'Change-over · ' + remainder + ' min' : '', used: items.map(i => i.name) };
+    return { kind: 'circuit', type: 'endurance', stations: pick.S, rounds: pick.N, items, remainder: 0, minutesUsed: pick.N * (pick.S + 1),
+      intro, tail: '', used: items.map(i => i.name) };
   }
 
   /* ---------- main block: cardio as one modality (exercise-reference.md §5) ---------- */
@@ -556,6 +566,47 @@
   }
 
   /* ---------- the workout ---------- */
+  /* ---------- the main block as segments (workout-rules.md §8, decision 4 of 2026-11-12) ---------- */
+  const TYPE_ORDER = ['strength', 'power', 'endurance'];
+  /* Caps and the fill: a pairs segment holds at most 5 rounds per pair and a circuit at most 4 rounds. When the rows for a type are used
+     up before the block is full, Endurance first adds a further circuit of fresh rows; then the block continues with the next type for the
+     same focus (strength → power → endurance, wrapping, each type at most once) and the header names the mix. What no segment can fill
+     prints as change-over. */
+  function fillMain(ctx, firstPool, main, type, reserve) {
+    const segments = [];
+    let left = main;
+    const start = TYPE_ORDER.indexOf(type);
+    for (let k = 0; k < TYPE_ORDER.length && left > 0; k++) {
+      const segType = TYPE_ORDER[(start + k) % TYPE_ORDER.length];
+      for (;;) { // one pairs segment per type; circuits repeat while fresh rows remain
+        const pool = (segments.length ? poolFor(ctx.library, ctx.sel, ctx.sel.focus, segType) : firstPool).filter(r => !ctx.usedMain.has(r.name));
+        const seg = segType === 'endurance' ? circuitBlock(ctx, pool, left, reserve) : pairsBlock(ctx, pool, left, segType, segments.length ? 2 : 1);
+        if (!seg) break;
+        segments.push(seg); seg.used.forEach(n => ctx.usedMain.add(n)); left -= seg.minutesUsed;
+        if (seg.kind !== 'circuit' || left <= 0) break;
+      }
+    }
+    if (!segments.length) throw new Error('No exercise fits ' + selectionText(ctx.sel) + '.');
+    const m = composeMain(segments, main);
+    if (m.types.length > 1) {
+      const firstRows = segments.filter(s => s.type === m.types[0]).reduce((a, s) => a + s.items.length, 0);
+      ctx.notes.push(typeLabel(m.types[0]) + ' rows for ' + focusLabel(ctx.sel.focus) + ' ran out after ' + firstRows + ' exercises; the block continues as ' + m.types.slice(1).map(typeLabel).join(', then ') + '.');
+    }
+    return m;
+  }
+  function composeMain(segments, main) {
+    const minutesUsed = segments.reduce((a, s) => a + s.minutesUsed, 0), remainder = main - minutesUsed;
+    const last = segments[segments.length - 1];
+    last.remainder = remainder;
+    last.tail = remainder ? (last.kind === 'circuit' ? 'Change-over · ' : last.kind === 'cardio' ? 'Easy finish · ' : 'Set-up and change-over · ') + remainder + ' min' : '';
+    const items = [].concat.apply([], segments.map(s => s.items));
+    const types = []; segments.forEach(s => { if (types[types.length - 1] !== s.type) types.push(s.type); });
+    const m = { kind: segments.length === 1 ? segments[0].kind : 'mixed', segments, types, items, minutesUsed, remainder, intro: segments[0].intro, tail: last.tail,
+      alternatives: segments.length === 1 ? segments[0].alternatives : undefined, used: items.map(i => i.name), rampUpMinutes: segments.reduce((a, s) => a + (s.rampUpMinutes || 0), 0) };
+    if (segments.length === 1) ['type', 'roundMinutes', 'rounds', 'pairs', 'stations', 'capped'].forEach(k => { if (k in segments[0]) m[k] = segments[0][k]; });
+    return m;
+  }
+
   function buildWorkout(library, sel, log, today) {
     const errs = validateSelections(sel);
     if (errs.length) throw new RangeError(errs.join(' '));
@@ -563,11 +614,9 @@
     const b = blockMinutes(sel.time);
     const ae = allowedExercises(library, sel);
     const type = ae.deliveredType;
-    const ctx = { library, sel, notes: ae.notes.slice(), start: dayIndex(today) + focusCount(log, sel.focus) };
-    let main;
-    if (sel.focus === 'cardio') main = cardioBlock(ctx, ae.pool, b.main, type);
-    else if (type === 'endurance') main = circuitBlock(ctx, ae.pool, b.main, sel.focus === 'core' ? b.minCore : 0);
-    else main = pairsBlock(ctx, ae.pool, b.main, type);
+    const ctx = { library, sel, notes: ae.notes.slice(), start: dayIndex(today) + focusCount(log, sel.focus), usedMain: new Set(), mainMinutes: b.main };
+    const main = sel.focus === 'cardio' ? composeMain([Object.assign(cardioBlock(ctx, ae.pool, b.main, type), { type })], b.main)
+      : fillMain(ctx, ae.pool, b.main, type, sel.focus === 'core' ? b.minCore : 0);
     const used = new Set(main.used);
     const core = coreBlock(ctx, b.minCore, used);
     core.items.forEach(i => used.add(i.name));
@@ -578,7 +627,7 @@
       version: APP_VERSION, specVersion: SPEC_VERSION, date: today,
       selections: { time: sel.time, equipment: sel.equipment, machines: (sel.machines || []).slice(), focus: sel.focus, type: sel.type },
       header: {
-        focus: focusLabel(sel.focus), type: typeLabel(type), chosenType: typeLabel(sel.type), typeChanged: type !== sel.type,
+        focus: focusLabel(sel.focus), type: main.types.map(typeLabel).join(', then '), mixed: main.types.length > 1, chosenType: typeLabel(sel.type), typeChanged: type !== sel.type,
         total: sel.time, equipment: equipLabel(sel.equipment), machines: (sel.machines || []).slice(),
         showsMachines: sel.equipment in DEFAULT_MACHINES
       },
@@ -603,10 +652,12 @@
     L.push('Warm-up · ' + w.blocks.warmup + ' min');
     w.warmup.forEach(i => L.push('  ' + i.name + ' · ' + i.text));
     L.push('Main block · ' + w.blocks.main + ' min');
-    L.push('  ' + w.main.intro);
-    w.main.items.forEach(i => L.push('  ' + (i.tag ? i.tag + ' ' : '') + i.name + ' · ' + i.text + (i.note ? ' (' + i.note + ')' : '')));
-    if (w.main.alternatives && w.main.alternatives.length) L.push('  Also fits: ' + w.main.alternatives.join(', '));
-    if (w.main.tail) L.push('  ' + w.main.tail);
+    (w.main.segments || [w.main]).forEach(s => {
+      L.push('  ' + s.intro);
+      s.items.forEach(i => L.push('  ' + (i.tag ? i.tag + ' ' : '') + i.name + ' · ' + i.text + (i.note ? ' (' + i.note + ')' : '')));
+      if (s.alternatives && s.alternatives.length) L.push('  Also fits: ' + s.alternatives.join(', '));
+      if (s.tail) L.push('  ' + s.tail);
+    });
     L.push('Cool-down · ' + w.blocks.cooldown + ' min');
     w.cooldown.stretch.forEach(i => L.push('  ' + i.name + ' · ' + i.text));
     L.push('  Core · ' + w.cooldown.core.minutes + ' min');
@@ -645,31 +696,40 @@
     if (WEIGHT_RE.test(w.text)) v.push('a weight is stated');
     if (PUSH_THROUGH_RE.test(w.text)) v.push('"push through" language');
     if (w.text.indexOf(SAFETY_LINE) < 0) v.push('safety line missing');
-    if (w.main.kind === 'pairs') {
+    const segs = w.main.segments || [w.main];
+    const segUsed = segs.reduce((a, s) => a + s.minutesUsed, 0);
+    if (segUsed !== w.main.minutesUsed) v.push('segments use ' + segUsed + ' min, the block says ' + w.main.minutesUsed);
+    if (segs.length > 1 && segs.some(s => s.type !== segs[0].type) && !/, then /.test(w.header.type)) v.push('a mixed block without a mixed header');
+    segs.forEach((s, si) => {
+      const where = segs.length > 1 ? ' (segment ' + (si + 1) + ')' : '';
+      if (s.kind === 'circuit' && s.rounds > TIMING.endurance.maxRounds) v.push('circuit of ' + s.rounds + ' rounds, above ' + TIMING.endurance.maxRounds + where);
+      if (s.kind !== 'pairs') return;
+      const cfg = TIMING[s.type] || TIMING.strength;
+      s.items.forEach(i => { if (i.sets > cfg.maxRoundsPerPair) v.push('"' + i.name + '" has ' + i.sets + ' rounds, above ' + cfg.maxRoundsPerPair + where); });
       const byPair = {};
-      w.main.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (byPair[m[1]] = byPair[m[1]] || [])[+m[2] - 1] = findRow(library, i.name); });
+      s.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (byPair[m[1]] = byPair[m[1]] || [])[+m[2] - 1] = findRow(library, i.name); });
       let prevRank = -1;
       Object.keys(byPair).sort().forEach(L => {
         const a = byPair[L][0], b = byPair[L][1];
         if (!a || !b) return;
-        if (a.loadClass === 'barbell' && b.loadClass === 'barbell') v.push('pair ' + L + ' holds two barbell lifts');
-        if (wholeBodyLift(a) && wholeBodyLift(b)) v.push('pair ' + L + ' holds two whole-body compound lifts');
-        if (loadRank(a) > loadRank(b)) v.push('pair ' + L + ' puts the lighter load class first');
-        if (loadRank(a) < prevRank) v.push('pair ' + L + ' (' + a.loadClass + ') comes after a lighter pair');
+        if (a.loadClass === 'barbell' && b.loadClass === 'barbell') v.push('pair ' + L + ' holds two barbell lifts' + where);
+        if (wholeBodyLift(a) && wholeBodyLift(b)) v.push('pair ' + L + ' holds two whole-body compound lifts' + where);
+        if (loadRank(a) > loadRank(b)) v.push('pair ' + L + ' puts the lighter load class first' + where);
+        if (loadRank(a) < prevRank) v.push('pair ' + L + ' (' + a.loadClass + ') comes after a lighter pair' + where);
         prevRank = loadRank(a);
       });
-      const barbell = w.main.items.filter(i => i.tag && (findRow(library, i.name) || {}).loadClass === 'barbell');
+      const barbell = s.items.filter(i => i.tag && (findRow(library, i.name) || {}).loadClass === 'barbell');
       barbell.forEach(i => { if (!/^1 min ramp-up, then /.test(i.text)) v.push('"' + i.name + '" has no ramp-up minute'); });
-      w.main.items.forEach(i => { if (i.tag && /ramp-up/.test(i.text) && (findRow(library, i.name) || {}).loadClass !== 'barbell') v.push('"' + i.name + '" has a ramp-up minute but is not a barbell lift'); });
-      if ((w.main.rampUpMinutes || 0) !== barbell.length) v.push('ramp-up minutes (' + (w.main.rampUpMinutes || 0) + ') do not match the ' + barbell.length + ' barbell lifts');
-      if (w.main.rounds * w.main.roundMinutes + (w.main.rampUpMinutes || 0) !== w.main.minutesUsed) v.push('rounds, round length and ramp-up do not make the minutes used');
-    }
-    if (w.main.kind === 'pairs' && w.selections.type === 'strength' && !w.header.typeChanged) {
-      if (!w.main.items.some(i => /^A1$/.test(i.tag)) || !w.main.items.some(i => /^A2$/.test(i.tag))) v.push('strength block has no A1/A2 pair');
-      if (w.main.roundMinutes !== TIMING.strength.roundMinutes) v.push('strength rounds are ' + w.main.roundMinutes + ' min, not ' + TIMING.strength.roundMinutes);
-      w.main.items.forEach(i => { const row = findRow(library, i.name); if (row && row.types.includes('strength') && !/8–12|20–30 s|about 40 m/.test(i.text)) v.push('"' + i.name + '" is not dosed 8–12 reps, a hold or a distance'); });
-      w.main.items.forEach(i => { if (i.tag && !new RegExp('rest ' + TIMING.strength.restSeconds + ' s$').test(i.text)) v.push('"' + i.name + '" does not rest ' + TIMING.strength.restSeconds + ' s'); });
-    }
+      s.items.forEach(i => { if (i.tag && /ramp-up/.test(i.text) && (findRow(library, i.name) || {}).loadClass !== 'barbell') v.push('"' + i.name + '" has a ramp-up minute but is not a barbell lift'); });
+      if ((s.rampUpMinutes || 0) !== barbell.length) v.push('ramp-up minutes (' + (s.rampUpMinutes || 0) + ') do not match the ' + barbell.length + ' barbell lifts' + where);
+      if (s.rounds * s.roundMinutes + (s.rampUpMinutes || 0) !== s.minutesUsed) v.push('rounds, round length and ramp-up do not make the minutes used' + where);
+      if (s.type === 'strength') {
+        if (s.items.length > 1 && (!s.items.some(i => /^A1$/.test(i.tag)) || !s.items.some(i => /^A2$/.test(i.tag)))) v.push('strength block has no A1/A2 pair' + where);
+        if (s.roundMinutes !== TIMING.strength.roundMinutes) v.push('strength rounds are ' + s.roundMinutes + ' min, not ' + TIMING.strength.roundMinutes + where);
+        s.items.forEach(i => { const row = findRow(library, i.name); if (row && row.types.includes('strength') && !/8–12|20–30 s|about 40 m/.test(i.text)) v.push('"' + i.name + '" is not dosed 8–12 reps, a hold or a distance'); });
+        s.items.forEach(i => { if (i.tag && !new RegExp('rest ' + TIMING.strength.restSeconds + ' s$').test(i.text)) v.push('"' + i.name + '" does not rest ' + TIMING.strength.restSeconds + ' s'); });
+      }
+    });
     return v;
   }
 

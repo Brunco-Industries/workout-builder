@@ -374,15 +374,17 @@
     const count = E.weeklyCount(ST.log, today());
     const stale = S.stale ? '<div class="stale-note">Selections changed. Tap Build to refresh. The workout below is for the previous selections and cannot be logged.</div>' :
       (S.offered ? '<div class="stale-note">Built on ' + esc(E.longDate(w.date)) + ' and not logged. Log it below, or <button type="button" class="linkbtn" id="dismissBtn">dismiss it</button>.</div>' : '');
-    const mainItems = '<ol>' + w.main.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>';
+    // The main block is one or more segments (decision 4): each with its own intro, rows and tail. Older stored builds have no segments list.
+    const segHtml = (w.main.segments || [w.main]).map(s => '<p class="note">' + esc(s.intro) + '</p><ol>' +
+      s.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>' +
+      (s.alternatives && s.alternatives.length ? '<p class="small">Also fits: ' + esc(s.alternatives.join(', ')) + '</p>' : '') +
+      (s.tail ? '<p class="small">' + esc(s.tail) + '</p>' : '')).join('');
     el.innerHTML = stale + '<div class="result' + (S.stale ? ' stale' : '') + '">' +
       '<p class="title">' + esc(w.header.focus) + ' · ' + esc(w.header.type) + (w.header.typeChanged ? ' <span class="sub">(you chose ' + esc(w.header.chosenType) + ')</span>' : '') + ' · ' + w.header.total + ' min</p>' +
       '<p class="sub">' + esc(w.header.equipment) + (w.header.showsMachines ? (w.header.machines.length ? ' · machines: ' + esc(w.header.machines.map(m => (E.MACHINE_LABELS[m] || m).toLowerCase()).join(', ')) : ' · no machines ticked') : '') + '</p>' +
       w.notes.map(n => '<div class="subst">' + esc(n) + '</div>').join('') +
       '<section class="block"><h4>Warm-up <span class="min">' + b.warmup + ' min</span></h4>' + list(w.warmup) + '</section>' +
-      '<section class="block"><h4>Main block <span class="min">' + b.main + ' min</span></h4><p class="note">' + esc(w.main.intro) + '</p>' + mainItems +
-        (w.main.alternatives && w.main.alternatives.length ? '<p class="small">Also fits: ' + esc(w.main.alternatives.join(', ')) + '</p>' : '') +
-        (w.main.tail ? '<p class="small">' + esc(w.main.tail) + '</p>' : '') + '</section>' +
+      '<section class="block"><h4>Main block <span class="min">' + b.main + ' min</span></h4>' + segHtml + '</section>' +
       '<section class="block"><h4>Cool-down <span class="min">' + b.cooldown + ' min</span></h4>' + list(w.cooldown.stretch) +
         '<div class="core"><h5>Core <span class="min">' + w.cooldown.core.minutes + ' min</span></h5>' + list(w.cooldown.core.items) + '<p class="small" style="margin-top:4px">' + esc(w.cooldown.core.tail) + '</p></div></section>' +
       '<p class="safety">' + esc(w.safety) + '</p>' +
@@ -430,7 +432,7 @@
     const row = {
       id: newId(), date: d, week_start: E.mondayOf(d), time_selected_min: w.selections.time, equipment: w.selections.equipment,
       focus: swapped ? swapped.focus : w.selections.focus, type: swapped ? swapped.type : w.selections.type,
-      status, actual_min: '', note: swapped ? 'selected: ' + w.selections.focus + '/' + w.selections.type : ''
+      status, actual_min: '', note: [swapped ? 'selected: ' + w.selections.focus + '/' + w.selections.type : '', w.header.mixed ? 'built as ' + w.header.type : ''].filter(Boolean).join('; ')
     };
     const errs = E.validateLogRow(row);
     if (errs.length) { toast('Not recorded: ' + errs[0]); return; }
