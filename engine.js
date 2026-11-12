@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.2'; // A2: user-facing wording; the block-sum guard kept in code, the line hidden
+  const APP_VERSION = '0.4.3'; // A3: time picker, a stepper with quick picks instead of 22 chips
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

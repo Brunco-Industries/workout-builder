@@ -25,6 +25,11 @@
   .chips.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
   .chip{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:8px 12px;font:inherit;font-size:.9rem;color:var(--ink);flex:0 0 auto;scroll-snap-align:start;min-height:40px}
   .chip[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .timepick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .timepick .step{min-width:64px;font-weight:700}
+  .timepick .step[disabled]{opacity:.4}
+  .timepick .val{min-width:96px;text-align:center;font-weight:700;font-size:1.15rem}
+  .timepick .quick{display:flex;flex-wrap:wrap;gap:6px;width:100%;margin-top:4px}
   .btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:700;background:var(--accent);color:var(--accent-ink);margin:10px 0 4px}
   .btn[disabled]{background:#c9d3cc;color:#3b4a40}
   .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
@@ -102,7 +107,7 @@
   <div id="goalArea"></div>
 
   <p class="needs" id="needsLine">To build a workout the app needs: time, equipment, focus and type.</p>
-  <div class="row"><span class="lbl">Time (minutes, includes warm-up and cool-down)</span><div class="chips scroll" id="timeChips"></div></div>
+  <div class="row"><span class="lbl">Time (minutes, includes warm-up and cool-down)</span><div class="timepick" id="timeChips"></div></div>
   <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div><p class="hint" style="margin:6px 0 0">Bodyweight moves are included with every option.</p></div>
   <div class="row" id="machineRow" hidden><span class="lbl">Machines here (tick any)</span><div class="chips" id="machineChips"></div></div>
   <div class="row"><span class="lbl">Focus</span><div class="chips" id="focusChips"></div></div>
@@ -220,8 +225,23 @@
     });
   }
   function changed() { if (S.result) S.stale = true; S.swapping = false; renderSelectors(); renderBuild(); renderResult(); renderLog(); }
+  /* Time: a stepper in 5-minute steps with quick picks. Only values in E.TIMES can be produced; validation is unchanged. */
+  function renderTime() {
+    const c = $('timeChips'); c.innerHTML = '';
+    const t = S.sel.time, idx = t === null ? -1 : E.TIMES.indexOf(t);
+    const mk = (txt, cls, dis, on, pressed, label) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = txt; b.disabled = !!dis;
+      if (pressed !== undefined) b.setAttribute('aria-pressed', pressed ? 'true' : 'false'); if (label) b.setAttribute('aria-label', label); b.onclick = on; return b;
+    };
+    c.appendChild(mk('−5', 'chip step', idx <= 0, () => { S.sel.time = E.TIMES[idx - 1]; changed(); }, undefined, '5 minutes less'));
+    const v = document.createElement('span'); v.className = 'val'; v.textContent = t === null ? 'not set' : t + ' min'; c.appendChild(v);
+    c.appendChild(mk('+5', 'chip step', idx >= E.TIMES.length - 1, () => { S.sel.time = E.TIMES[idx < 0 ? 0 : idx + 1]; changed(); }, undefined, '5 minutes more'));
+    const quick = document.createElement('div'); quick.className = 'quick';
+    [15, 30, 45, 60, 90, 120].forEach(q => quick.appendChild(mk(String(q), 'chip', false, () => { S.sel.time = q; changed(); }, t === q)));
+    c.appendChild(quick);
+  }
   function renderSelectors() {
-    chipRow('timeChips', E.TIMES.map(t => [t, String(t)]), k => S.sel.time === k, k => { S.sel.time = k; changed(); });
+    renderTime();
     chipRow('equipChips', E.EQUIPMENT.map(e => [e.key, e.label]), k => S.sel.equipment === k, k => { S.sel.equipment = k; S.sel.machines = (E.DEFAULT_MACHINES[k] || []).slice(); changed(); });
     const gym = S.sel.equipment in E.DEFAULT_MACHINES;
     $('machineRow').hidden = !gym;
@@ -230,7 +250,6 @@
     });
     chipRow('focusChips', E.FOCUS.map(f => [f.key, f.label]), k => S.sel.focus === k, k => { S.sel.focus = k; changed(); });
     chipRow('typeChips', E.TYPES.map(t => [t.key, t.label]), k => S.sel.type === k, k => { S.sel.type = k; changed(); });
-    const on = $('timeChips').querySelector('[aria-pressed=true]'); if (on) { try { on.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) {} }
   }
   function missing() {
     const m = []; if (S.sel.time === null) m.push('time'); if (!S.sel.equipment) m.push('equipment'); if (!S.sel.focus) m.push('focus'); if (!S.sel.type) m.push('type'); return m;
