@@ -1,107 +1,183 @@
-/* library.js: knowledge/exercise-library.csv embedded verbatim. Generated 2026-10-04 by .claude/build-library.sh; do not edit by hand. */
-window.EXERCISE_LIBRARY_CSV = `exercise,focus,types,needs,allowed_equipment,notes,pattern
-Easy cardio (any machine ticked),warmup,-,treadmill|bike|rower|elliptical|stairclimber,FG;BG,,cardio
-Easy rower,warmup,-,rower,FG;BG,,cardio
-Brisk walk or march in place,warmup,-,none,FG;BG;DB;KB;BW,,cardio
-Arm circles,warmup,-,none,FG;BG;DB;KB;BW,,mobility
-Leg swings,warmup,-,none,FG;BG;DB;KB;BW,,mobility
-Bodyweight squat,warmup;lower,endurance,none,FG;BG;DB;KB;BW,,squat
-Inchworm,warmup,-,none,FG;BG;DB;KB;BW,,mobility
-World's greatest stretch,warmup,-,none,FG;BG;DB;KB;BW,,mobility
-Light ramp-up sets of first exercise,warmup,-,none,FG;BG;DB;KB;BW,Uses whatever equipment the first exercise uses,mobility
-Doorway chest stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch
-Lat stretch (hands on wall or chair),cooldown,-,none,FG;BG;DB;KB;BW,,stretch
-Hamstring stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch
-Hip flexor stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch
-Figure-4 glute stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch
-Child's pose,cooldown,-,none,FG;BG;DB;KB;BW,,stretch
-Quad stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch
-Barbell bench press,upper,strength,barbell;bench;rack,FG,,push
-Dumbbell bench press,upper,strength;endurance,bench;db,FG;BG,,push
-Dumbbell floor press,upper,strength;endurance,db,FG;BG;DB,No bench needed,push
-Push-up,upper,strength;endurance,none,FG;BG;DB;KB;BW,Elevate feet for harder strength sets,push
-Plyometric push-up,upper,power,none,FG;BG;DB;KB;BW,,push
-Barbell overhead press,upper,strength,barbell;rack,FG,,push
-Seated dumbbell overhead press,upper,strength;endurance,bench;db,FG;BG,,push
-Standing dumbbell overhead press,upper,strength;endurance,db,FG;BG;DB,,push
-Kettlebell overhead press,upper,strength;endurance,kb,FG;KB,,push
-Pike push-up,upper,strength;endurance,none,FG;BG;DB;KB;BW,,push
-Pull-up or chin-up,upper,strength;endurance,pullbar,FG,,pull
-Lat pulldown,upper,strength;endurance,machine,FG,,pull
-Barbell bent-over row,upper,strength,barbell,FG,,pull
-One-arm dumbbell row (bench-supported),upper,strength;endurance,bench;db,FG;BG,,pull
-Dumbbell bent-over row,upper,strength;endurance,db,FG;BG;DB,,pull
-Kettlebell bent-over row,upper,strength;endurance,kb,FG;KB,,pull
-Seated cable row,upper,strength;endurance,cable,FG,,pull
-Medicine-ball chest pass,upper,power,medball,FG,Throw against a wall,push
-Dumbbell push press,upper;total,power,db,FG;BG;DB,,push
-Kettlebell push press,upper;total,power,kb,FG;KB,,push
-Chair dips,upper,endurance,none,FG;BG;DB;KB;BW,Sturdy chair or bench,push
-Dumbbell lateral raise,upper,endurance,db,FG;BG;DB,,isolation
-Dumbbell biceps curl,upper,endurance,db,FG;BG;DB,,isolation
-Barbell back squat,lower,strength,barbell;rack,FG,,squat
-Barbell deadlift,lower;total,strength,barbell,FG,,hinge
-Barbell hip thrust,lower,strength,barbell;bench,FG,,hinge
-Leg press,lower,strength;endurance,machine,FG,,squat
-Dumbbell goblet squat,lower,strength;endurance,db,FG;BG;DB,,squat
-Kettlebell goblet squat,lower,strength;endurance,kb,FG;KB,,squat
-Dumbbell Romanian deadlift,lower,strength;endurance,db,FG;BG;DB,,hinge
-Kettlebell Romanian deadlift,lower,strength;endurance,kb,FG;KB,,hinge
-Dumbbell reverse lunge,lower,strength;endurance,db,FG;BG;DB,,lunge
-Dumbbell Bulgarian split squat,lower,strength;endurance,db,FG;BG;DB,Rear foot on a bench or sturdy chair,lunge
-Bodyweight Bulgarian split squat,lower,endurance,none,FG;BG;DB;KB;BW,Rear foot on a sturdy chair,lunge
-Box jump,lower,power,box,FG,,jump
-Squat jump,lower,power,none,FG;BG;DB;KB;BW,,jump
-Broad jump,lower,power,none,FG;BG;DB;KB;BW,,jump
-Kettlebell swing,lower;total,power;endurance,kb,FG;KB,,hinge
-Walking lunge,lower,endurance,none,FG;BG;DB;KB;BW,,lunge
-Wall sit,lower,endurance,none,FG;BG;DB;KB;BW,,squat
-Single-leg squat to chair,lower,strength,none,FG;BG;DB;KB;BW,Hardest bodyweight lower option; nearest valid strength choice with no equipment,squat
-Single-leg glute bridge,lower,endurance,none,FG;BG;DB;KB;BW,,hinge
-Step-up (stairs or sturdy chair),lower,endurance,none,FG;BG;DB;KB;BW,,lunge
-Calf raise,lower,endurance,none,FG;BG;DB;KB;BW,,isolation
-Barbell power clean,total,power,barbell,FG,,hinge
-Dumbbell snatch,total,power,db,FG;BG;DB,,hinge
-Kettlebell snatch,total,power,kb,FG;KB,,hinge
-Dumbbell thruster,total,strength;endurance,db,FG;BG;DB,,squat
-Kettlebell thruster,total,strength;endurance,kb,FG;KB,,squat
-Dumbbell clean and press,total,strength;power,db,FG;BG;DB,,hinge
-Kettlebell Turkish get-up,total;core,strength,kb,FG;KB,,brace
-Burpee,total;cardio,power;endurance,none,FG;BG;DB;KB;BW,,jump
-Mountain climbers,total;core;cardio,endurance,none,FG;BG;DB;KB;BW,,brace
-Dumbbell farmer carry,total;core,strength,db,FG;BG;DB,,carry
-Kettlebell farmer carry,total;core,strength,kb,FG;KB,,carry
-Plank,core,endurance,none,FG;BG;DB;KB;BW,,brace
-Side plank,core,endurance,none,FG;BG;DB;KB;BW,,brace
-Dead bug,core,endurance,none,FG;BG;DB;KB;BW,,brace
-Hollow hold,core,endurance,none,FG;BG;DB;KB;BW,,brace
-Bird dog,core,endurance,none,FG;BG;DB;KB;BW,,brace
-Bicycle crunch,core,endurance,none,FG;BG;DB;KB;BW,,flex
-Dumbbell suitcase carry,core,strength,db,FG;BG;DB,,carry
-Kettlebell suitcase carry,core,strength,kb,FG;KB,,carry
-Dumbbell Russian twist,core,endurance,db,FG;BG;DB,,rotate
-Kettlebell Russian twist,core,endurance,kb,FG;KB,,rotate
-Pallof press,core,strength,cable,FG,,brace
-Hanging knee raise,core,strength,pullbar,FG,,flex
-Ab-wheel rollout,core,strength,machine,FG,Counts as full-gym equipment,brace
-Medicine-ball rotational throw,core,power,medball,FG,Throw against a wall,rotate
-Medicine-ball slam,core;total,power,medball,FG,,flex
-Fast dumbbell woodchop,core,power,db,FG;BG;DB,Nearest valid core-power option without a medicine ball,rotate
-Fast kettlebell woodchop,core,power,kb,FG;KB,Nearest valid core-power option without a medicine ball,rotate
-"Treadmill, bike or elliptical steady effort",cardio,endurance,treadmill|bike|elliptical,FG;BG,,cardio
-Stair climber steady climb,cardio,endurance,stairclimber,FG;BG,Added 2026-10-04 with the machine checklist; for Stephen's review,cardio
-Rower steady effort,cardio,endurance,rower,FG;BG,,cardio
-Outdoor run or brisk walk,cardio,endurance,none,FG;BG;DB;KB;BW,,cardio
-Treadmill steep incline walk,cardio,strength,treadmill,FG;BG,,cardio
-Bike heavy-resistance intervals,cardio,strength,bike,FG;BG,,cardio
-Elliptical heavy-resistance intervals,cardio,strength,elliptical,FG;BG,Added 2026-10-04 for the machine checklist; for Stephen's review,cardio
-Stair climber hard-climb intervals,cardio,strength,stairclimber,FG;BG,Added 2026-10-04 with the machine checklist; for Stephen's review,cardio
-Hill or stair climbing,cardio,strength,none,FG;BG;DB;KB;BW,,cardio
-Sled push or drag,cardio;total,strength,sled,FG,Appears only when the sled is ticked,carry
-Bike sprints,cardio,power,bike,FG;BG,,cardio
-Elliptical sprints,cardio,power,elliptical,FG;BG,Added 2026-10-04 for the machine checklist; for Stephen's review,cardio
-Rower sprints,cardio,power,rower,FG;BG,,cardio
-Outdoor sprints,cardio,power,none,FG;BG;DB;KB;BW,,cardio
-Kettlebell swing intervals,cardio,endurance,kb,FG;KB,,hinge
-"Bodyweight circuit (squat, push-up, lunge, mountain climber)",cardio;total,endurance,none,FG;BG;DB;KB;BW,,cardio
+/* library.js: knowledge/exercise-library.csv embedded verbatim. Generated 2026-11-12 by .claude/build-library.sh; do not edit by hand. */
+window.EXERCISE_LIBRARY_CSV = `exercise,focus,types,needs,allowed_equipment,notes,pattern,load_class,dose,cooldown,cue
+Easy cardio (any machine ticked),warmup,-,treadmill|bike|rower|elliptical|stairclimber,FG;BG,,cardio,weights,time,no,"Easy pace on any machine, a pace you could talk through in full sentences."
+Easy rower,warmup,-,rower,FG;BG,,cardio,weights,time,no,"Light strokes: legs, then back, then arms, no straining."
+Brisk walk or march in place,warmup,-,none,FG;BG;DB;KB;BW,,cardio,bodyweight,time,no,"Walk or march at a pace that warms you without puffing."
+Arm circles,warmup,-,none,FG;BG;DB;KB;BW,,mobility,bodyweight,time,no,"Small circles growing to large, both directions, shoulders relaxed."
+Leg swings,warmup,-,none,FG;BG;DB;KB;BW,,mobility,bodyweight,reps,no,"Hold a wall; swing one leg front to back, then side to side, under control."
+Bodyweight squat,warmup;lower,endurance,none,FG;BG;DB;KB;BW,,squat,bodyweight,reps,no,"Feet shoulder-width, sit back and down with the heels planted, chest up, stand tall."
+Inchworm,warmup,-,none,FG;BG;DB;KB;BW,,mobility,bodyweight,reps,no,"Fold forward, walk the hands out to a plank, walk the feet back in."
+World's greatest stretch,warmup,-,none,FG;BG;DB;KB;BW,,mobility,bodyweight,reps,no,"Lunge forward, drop the inside hand to the floor, reach the other arm to the ceiling; switch sides."
+Light ramp-up sets of first exercise,warmup,-,none,FG;BG;DB;KB;BW,Uses whatever equipment the first exercise uses,mobility,weights,reps,no,"Two or three light sets of the first lift, rising toward the working weight, never to fatigue."
+Doorway chest stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch,bodyweight,time,yes,"Forearm on the door frame, step through until the chest opens, breathe."
+Lat stretch (hands on wall or chair),cooldown,-,none,FG;BG;DB;KB;BW,,stretch,bodyweight,time,yes,"Hands on the wall, hinge back until the sides of the back stretch, head between the arms."
+Hamstring stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch,bodyweight,time,yes,"One heel forward, hips back with a flat back until the back of the thigh pulls."
+Hip flexor stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch,bodyweight,time,yes,"Half-kneel, tuck the tailbone and shift forward until the front of the hip stretches."
+Figure-4 glute stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch,bodyweight,time,yes,"Ankle over the opposite knee, pull the legs toward the chest, lying or seated."
+Child's pose,cooldown,-,none,FG;BG;DB;KB;BW,,stretch,bodyweight,time,yes,"Knees wide, sit back onto the heels, arms long, let the back settle."
+Quad stretch,cooldown,-,none,FG;BG;DB;KB;BW,,stretch,bodyweight,time,yes,"Hold the ankle behind you, knees together, hips forward, stand tall."
+Barbell bench press,upper,strength,barbell;bench;rack,FG,,push,barbell,reps,no,"Bar over the chest, feet planted, lower to the chest under control and press up."
+Dumbbell bench press,upper,strength;endurance,bench;db,FG;BG,,push,weights,reps,no,"Dumbbells over the chest, lower to the sides of the chest and press up together."
+Dumbbell floor press,upper,strength;endurance,db,FG;BG;DB,No bench needed,push,weights,reps,no,"Lie on the floor, let the elbows touch down lightly each rep, press up."
+Push-up,upper,strength;endurance,none,FG;BG;DB;KB;BW,Elevate feet for harder strength sets,push,bodyweight,reps,no,"Hands under the shoulders, body straight, chest to the floor and back up."
+Plyometric push-up,upper,power,none,FG;BG;DB;KB;BW,,push,bodyweight,reps,no,"Push up hard enough for the hands to leave the floor; land soft and reset."
+Barbell overhead press,upper,strength,barbell;rack,FG,,push,barbell,reps,no,"Bar at the collarbones, brace, press overhead to lockout with the bar over the mid-foot."
+Seated dumbbell overhead press,upper,strength;endurance,bench;db,FG;BG,,push,weights,reps,no,"Seated tall, press the dumbbells overhead without arching the back."
+Standing dumbbell overhead press,upper,strength;endurance,db,FG;BG;DB,,push,weights,reps,no,"Stand braced, press overhead, lower to the shoulders under control."
+Kettlebell overhead press,upper,strength;endurance,kb,FG;KB,,push,weights,reps,no,"Bell racked at the shoulder, press straight up, lower slowly."
+Pike push-up,upper,strength;endurance,none,FG;BG;DB;KB;BW,,push,bodyweight,reps,no,"Hips high in an inverted V, lower the head toward the floor, press back."
+Pull-up or chin-up,upper,strength;endurance,pullbar,FG,,pull,bodyweight,reps,no,"Hang from the bar, pull until the chin passes it, lower all the way."
+Lat pulldown,upper,strength;endurance,machine,FG,,pull,weights,reps,no,"Pull the bar to the upper chest with the elbows down, control it back up."
+Barbell bent-over row,upper,strength,barbell,FG,,pull,barbell,reps,no,"Hinge to a flat back, pull the bar to the lower ribs, lower under control."
+One-arm dumbbell row (bench-supported),upper,strength;endurance,bench;db,FG;BG,,pull,weights,reps,no,"Hand and knee on the bench, row the dumbbell to the hip without twisting."
+Dumbbell bent-over row,upper,strength;endurance,db,FG;BG;DB,,pull,weights,reps,no,"Hinge with a flat back, row both dumbbells to the hips, squeeze the back."
+Kettlebell bent-over row,upper,strength;endurance,kb,FG;KB,,pull,weights,reps,no,"Hinge, row the bell to the hip, elbow close to the body."
+Seated cable row,upper,strength;endurance,cable,FG,,pull,weights,reps,no,"Sit tall, pull the handle to the stomach, let the shoulders reach forward on the return."
+Medicine-ball chest pass,upper,power,medball,FG,Throw against a wall,push,weights,reps,no,"Chest-height throw at the wall as hard as you can; catch and reset."
+Dumbbell push press,upper;total,power,db,FG;BG;DB,,push,weights,reps,no,"Dip the knees slightly, drive up and press the dumbbells overhead in one movement."
+Kettlebell push press,upper;total,power,kb,FG;KB,,push,weights,reps,no,"Dip and drive, press the bell overhead, lower to the rack."
+Chair dips,upper,endurance,none,FG;BG;DB;KB;BW,Sturdy chair or bench,push,bodyweight,reps,no,"Hands on the chair edge behind you, lower until the elbows reach 90 degrees, press up."
+Dumbbell lateral raise,upper,endurance,db,FG;BG;DB,,isolation,weights,reps,no,"Raise the dumbbells out to shoulder height with a slight elbow bend, lower slowly."
+Dumbbell biceps curl,upper,endurance,db,FG;BG;DB,,isolation,weights,reps,no,"Elbows at the sides, curl up without swinging, lower slowly."
+Barbell back squat,lower,strength,barbell;rack,FG,,squat,barbell,reps,no,"Bar on the upper back, brace, sit down until the thighs are at least parallel, drive up."
+Barbell deadlift,lower;total,strength,barbell,FG,,hinge,barbell,reps,no,"Bar over the mid-foot, flat back, push the floor away and stand tall; lower with control."
+Barbell hip thrust,lower,strength,barbell;bench,FG,,hinge,barbell,reps,no,"Upper back on the bench, bar across the hips, drive up until the hips are level, squeeze."
+Leg press,lower,strength;endurance,machine,FG,,squat,weights,reps,no,"Feet shoulder-width on the plate, lower until the knees are near 90 degrees, press without locking out."
+Dumbbell goblet squat,lower,strength;endurance,db,FG;BG;DB,,squat,weights,reps,no,"Hold the dumbbell at the chest, squat deep with the elbows inside the knees."
+Kettlebell goblet squat,lower,strength;endurance,kb,FG;KB,,squat,weights,reps,no,"Bell at the chest, squat deep, stand tall."
+Dumbbell Romanian deadlift,lower,strength;endurance,db,FG;BG;DB,,hinge,weights,reps,no,"Soft knees, hinge at the hips with a flat back until the hamstrings pull, stand up."
+Kettlebell Romanian deadlift,lower,strength;endurance,kb,FG;KB,,hinge,weights,reps,no,"Hinge with a flat back, bell close to the legs, stand by driving the hips forward."
+Dumbbell reverse lunge,lower,strength;endurance,db,FG;BG;DB,,lunge,weights,reps,no,"Step back into a lunge, front knee over the foot, push back to standing."
+Dumbbell Bulgarian split squat,lower,strength;endurance,db,FG;BG;DB,Rear foot on a bench or sturdy chair,lunge,weights,reps,no,"Rear foot on the bench, lower straight down until the front thigh is parallel, drive up."
+Bodyweight Bulgarian split squat,lower,endurance,none,FG;BG;DB;KB;BW,Rear foot on a sturdy chair,lunge,bodyweight,reps,no,"Rear foot on the chair, lower straight down, drive up through the front heel."
+Box jump,lower,power,box,FG,,jump,bodyweight,reps,no,"Swing the arms, jump onto the box, land soft and quiet, step down."
+Squat jump,lower,power,none,FG;BG;DB;KB;BW,,jump,bodyweight,reps,no,"Squat, jump as high as you can, land soft into the next squat."
+Broad jump,lower,power,none,FG;BG;DB;KB;BW,,jump,bodyweight,reps,no,"Jump forward as far as you can, stick the landing, walk back and reset."
+Kettlebell swing,lower;total,power;endurance,kb,FG;KB,,hinge,weights,reps,no,"Hinge, hike the bell back, snap the hips forward to chest height; the arms only guide it."
+Walking lunge,lower,endurance,none,FG;BG;DB;KB;BW,,lunge,bodyweight,reps,no,"Step forward into a lunge, push through the front heel into the next step."
+Wall sit,lower,endurance,none,FG;BG;DB;KB;BW,,squat,bodyweight,time,no,"Back flat on the wall, thighs parallel, hold."
+Single-leg squat to chair,lower,strength,none,FG;BG;DB;KB;BW,Hardest bodyweight lower option; nearest valid strength choice with no equipment,squat,bodyweight,reps,no,"Stand on one leg, sit back to touch the chair lightly, stand without the other foot."
+Single-leg glute bridge,lower,endurance,none,FG;BG;DB;KB;BW,,hinge,bodyweight,reps,no,"Lie on the back, one foot planted, drive the hips up, lower slowly."
+Step-up (stairs or sturdy chair),lower,endurance,none,FG;BG;DB;KB;BW,,lunge,bodyweight,reps,no,"Step up with the whole foot, drive through the heel, step down under control."
+Calf raise,lower,endurance,none,FG;BG;DB;KB;BW,,isolation,bodyweight,reps,no,"Rise onto the toes, pause at the top, lower slowly; a step adds range."
+Barbell power clean,total,power,barbell,FG,,hinge,barbell,reps,no,"Pull from the floor, extend hard, catch the bar at the shoulders with soft knees."
+Dumbbell snatch,total,power,db,FG;BG;DB,,hinge,weights,reps,no,"Hinge, pull the dumbbell up close to the body and punch it overhead in one movement."
+Kettlebell snatch,total,power,kb,FG;KB,,hinge,weights,reps,no,"Swing the bell up close to the body, punch through at the top, lock out overhead."
+Dumbbell thruster,total,strength;endurance,db,FG;BG;DB,,squat,weights,reps,no,"Front squat with the dumbbells at the shoulders, drive up and press overhead in one movement."
+Kettlebell thruster,total,strength;endurance,kb,FG;KB,,squat,weights,reps,no,"Squat with the bell racked, drive up and press overhead."
+Dumbbell clean and press,total,strength;power,db,FG;BG;DB,,hinge,weights,reps,no,"Clean the dumbbells to the shoulders, press overhead, lower and repeat."
+Kettlebell Turkish get-up,total;core,strength,kb,FG;KB,,brace,weights,reps,no,"Bell locked out overhead the whole way: roll to the elbow, to the hand, sweep the leg through, stand; reverse it."
+Burpee,total;cardio,power;endurance,none,FG;BG;DB;KB;BW,,jump,bodyweight,reps,no,"Drop to a push-up, jump the feet in, jump up; keep the pace steady."
+Mountain climbers,total;core;cardio,endurance,none,FG;BG;DB;KB;BW,,brace,bodyweight,time,no,"Plank position, drive the knees in alternately, hips level."
+Dumbbell farmer carry,total;core,strength,db,FG;BG;DB,,carry,weights,distance,no,"Heavy dumbbells at the sides, walk tall with short quick steps."
+Kettlebell farmer carry,total;core,strength,kb,FG;KB,,carry,weights,distance,no,"Bells at the sides, shoulders back, walk tall."
+Plank,core,endurance,none,FG;BG;DB;KB;BW,,brace,bodyweight,time,yes,"Forearms down, body straight from head to heels, squeeze the glutes."
+Side plank,core,endurance,none,FG;BG;DB;KB;BW,,brace,bodyweight,time,yes,"On one forearm, hips lifted and stacked, hold; switch sides."
+Dead bug,core,endurance,none,FG;BG;DB;KB;BW,,brace,bodyweight,reps,yes,"On the back, lower the opposite arm and leg slowly with the lower back pressed down."
+Hollow hold,core,endurance,none,FG;BG;DB;KB;BW,,brace,bodyweight,time,yes,"On the back, lower back pressed down, arms and legs lifted, hold."
+Bird dog,core,endurance,none,FG;BG;DB;KB;BW,,brace,bodyweight,reps,yes,"On hands and knees, reach the opposite arm and leg out long, hold a beat, switch."
+Bicycle crunch,core,endurance,none,FG;BG;DB;KB;BW,,flex,bodyweight,reps,yes,"Opposite elbow toward the knee, slowly, the other leg long."
+Dumbbell suitcase carry,core,strength,db,FG;BG;DB,,carry,weights,distance,no,"One heavy dumbbell at the side, walk tall without leaning; switch hands."
+Kettlebell suitcase carry,core,strength,kb,FG;KB,,carry,weights,distance,no,"One bell at the side, walk tall, no lean; switch hands."
+Dumbbell Russian twist,core,endurance,db,FG;BG;DB,,rotate,weights,reps,yes,"Seated and leaned back, turn the dumbbell side to side with the chest, not just the arms."
+Kettlebell Russian twist,core,endurance,kb,FG;KB,,rotate,weights,reps,yes,"Seated and leaned back, turn the bell side to side with the chest."
+Pallof press,core,strength,cable,FG,,brace,weights,reps,yes,"Side-on to the cable, press the handle straight out and hold against the pull, bring it back."
+Hanging knee raise,core,strength,pullbar,FG,,flex,bodyweight,reps,yes,"Hang from the bar, lift the knees to the chest without swinging, lower slowly."
+Ab-wheel rollout,core,strength,machine,FG,Counts as full-gym equipment,brace,bodyweight,reps,yes,"Kneel, roll the wheel out as far as the back stays flat, pull back."
+Medicine-ball rotational throw,core,power,medball,FG,Throw against a wall,rotate,weights,reps,no,"Side-on to the wall, turn and throw the ball from the hips, catch and repeat; switch sides."
+Medicine-ball slam,core;total,power,medball,FG,,flex,weights,reps,no,"Ball overhead, slam it into the floor as hard as you can, catch the bounce and repeat."
+Fast dumbbell woodchop,core,power,db,FG;BG;DB,Nearest valid core-power option without a medicine ball,rotate,weights,reps,no,"Swing the dumbbell from one hip to the opposite shoulder fast, control it back; switch sides."
+Fast kettlebell woodchop,core,power,kb,FG;KB,Nearest valid core-power option without a medicine ball,rotate,weights,reps,no,"Swing the bell from one hip to the opposite shoulder fast, control it back; switch sides."
+"Treadmill, bike or elliptical steady effort",cardio,endurance,treadmill|bike|elliptical,FG;BG,,cardio,weights,time,no,"A pace you could hold while speaking in short sentences."
+Stair climber steady climb,cardio,endurance,stairclimber,FG;BG,Added 2026-10-04 with the machine checklist; for Stephen's review,cardio,weights,time,no,"Steady steps at a pace you can keep, hands light on the rails."
+Rower steady effort,cardio,endurance,rower,FG;BG,,cardio,weights,time,no,"Legs, then back, then arms; return in reverse; a steady rate."
+Outdoor run or brisk walk,cardio,endurance,none,FG;BG;DB;KB;BW,,cardio,bodyweight,time,no,"A pace you could hold while talking in short sentences."
+Treadmill steep incline walk,cardio,strength,treadmill,FG;BG,,cardio,weights,time,no,"Steep incline, no hands on the rails, drive from the hips."
+Bike heavy-resistance intervals,cardio,strength,bike,FG;BG,,cardio,weights,time,no,"Resistance high enough that the legs work hard for the interval, then easy."
+Elliptical heavy-resistance intervals,cardio,strength,elliptical,FG;BG,Added 2026-10-04 for the machine checklist; for Stephen's review,cardio,weights,time,no,"High resistance for the interval, easy between."
+Stair climber hard-climb intervals,cardio,strength,stairclimber,FG;BG,Added 2026-10-04 with the machine checklist; for Stephen's review,cardio,weights,time,no,"Hard climb for the interval, easy steps between."
+Hill or stair climbing,cardio,strength,none,FG;BG;DB;KB;BW,,cardio,bodyweight,time,no,"Climb hard, walk down easy, repeat."
+Sled push or drag,cardio;total,strength,sled,FG,Appears only when the sled is ticked,carry,weights,distance,no,"Low body, arms straight, drive the legs; drag it back the same way."
+Bike sprints,cardio,power,bike,FG;BG,,cardio,weights,time,no,"All-out for the interval, spin easy to recover."
+Elliptical sprints,cardio,power,elliptical,FG;BG,Added 2026-10-04 for the machine checklist; for Stephen's review,cardio,weights,time,no,"All-out for the interval, easy between."
+Rower sprints,cardio,power,rower,FG;BG,,cardio,weights,time,no,"Maximum stroke power for the interval, easy paddling between."
+Outdoor sprints,cardio,power,none,FG;BG;DB;KB;BW,,cardio,bodyweight,time,no,"Sprint the interval, walk back to recover."
+Kettlebell swing intervals,cardio,endurance,kb,FG;KB,,hinge,weights,time,no,"Swings for the interval, bell down and breathe between."
+"Bodyweight circuit (squat, push-up, lunge, mountain climber)",cardio;total,endurance,none,FG;BG;DB;KB;BW,,cardio,bodyweight,time,no,"Rotate through the four moves at a steady pace for the whole block."
+Inverted row (bar in a rack),upper,strength;endurance,barbell;rack,FG,Added 2026-11-12 from the team library (UB-18); unreviewed,pull,bodyweight,reps,no,"Bar at waist height, hang beneath it with a straight body, pull the chest to the bar."
+Inverted row under a sturdy table,upper,strength;endurance,table,FG;BG;DB;KB;BW,Added 2026-11-12; needs a sturdy table (Bodyweight only definition extended); unreviewed,pull,bodyweight,reps,no,"Lie under a sturdy table, grip the edge, pull the chest to it with a straight body."
+Kettlebell high pull,upper;total,power,kb,FG;KB,Added 2026-11-12; unreviewed,pull,weights,reps,no,"Swing the bell, then pull the elbow high and out as the hips snap; lower along the same path."
+Dumbbell high pull,upper;total,power,db,FG;BG;DB,Added 2026-11-12; unreviewed,pull,weights,reps,no,"Hinge, then drive up and pull the dumbbells to chest height with the elbows high; lower under control."
+Barbell high pull,upper;total,power,barbell,FG,Added 2026-11-12; unreviewed,pull,barbell,reps,no,"From a hang, extend the hips hard and pull the bar to chest height, elbows high."
+Explosive inverted row,upper,power,barbell;rack,FG,Added 2026-11-12; unreviewed,pull,bodyweight,reps,no,"Pull fast enough that the hands could leave the bar; lower under control."
+Jumping lunge,lower,power,none,FG;BG;DB;KB;BW,Added 2026-11-12; unreviewed,jump,bodyweight,reps,no,"Lunge, jump and switch legs in the air, land soft into the next lunge."
+Tuck jump,lower;total,power,none,FG;BG;DB;KB;BW,Added 2026-11-12; unreviewed,jump,bodyweight,reps,no,"Jump and pull the knees to the chest, land soft, reset."
+Skater jump,lower,power,none,FG;BG;DB;KB;BW,Added 2026-11-12; unreviewed,jump,bodyweight,reps,no,"Bound sideways from one foot to the other, land soft and hold a beat."
+Shuttle run,cardio,power;endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (CD-11); unreviewed,cardio,bodyweight,time,no,"Sprint to a line and back, touch the floor at each turn."
+Jumping jacks,warmup;cardio,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (CD-09); unreviewed,cardio,bodyweight,time,no,"Jump the feet out as the arms go overhead, back in, steady rhythm."
+Leg extension,lower,strength;endurance,machine,FG,Added 2026-11-12 from the team library (LB-26); unreviewed,isolation,weights,reps,no,"Extend the knees fully, pause, lower slowly."
+Leg curl (lying or seated),lower,strength;endurance,machine,FG,Added 2026-11-12 from the team library (LB-27); unreviewed,isolation,weights,reps,no,"Curl the heels toward the glutes, pause, lower slowly."
+Hack squat,lower,strength,machine,FG,Added 2026-11-12 from the team library (LB-07); unreviewed,squat,weights,reps,no,"Shoulders under the pads, lower until the thighs are parallel, drive up."
+Machine chest press,upper,strength;endurance,machine,FG,Added 2026-11-12 from the team library (UB-06); unreviewed,push,weights,reps,no,"Handles at chest height, press forward without locking the elbows, return slowly."
+Machine shoulder press,upper,strength;endurance,machine,FG,Added 2026-11-12; unreviewed,push,weights,reps,no,"Press overhead without arching, lower to ear height."
+Assisted pull-up (machine),upper,strength;endurance,machine,FG,Added 2026-11-12 from the team library (UB-22); unreviewed,pull,weights,reps,no,"Knees on the pad, pull until the chin passes the bar, lower all the way."
+Cable face pull,upper,endurance,cable,FG,Added 2026-11-12 from the team library (UB-25); unreviewed,pull,weights,reps,no,"Pull the rope to the face with the elbows high, squeeze the upper back."
+Cable triceps pushdown,upper,endurance,cable,FG,Added 2026-11-12 from the team library (UB-32); unreviewed,isolation,weights,reps,no,"Elbows pinned at the sides, push the bar down to lockout, return slowly."
+Straight-arm pulldown,upper,endurance,cable,FG,Added 2026-11-12 from the team library (UB-24); unreviewed,pull,weights,reps,no,"Arms straight, pull the bar from eye height to the thighs with the lats."
+Cable pull-through,lower,strength;endurance,cable,FG,Added 2026-11-12 from the team library (LB-25); unreviewed,hinge,weights,reps,no,"Face away from the low cable, hinge back and drive the hips forward to stand."
+Cable woodchop,core,strength;endurance,cable,FG,Added 2026-11-12 from the team library (CO-11); unreviewed,rotate,weights,reps,no,"Pull the handle across the body from high to low with the trunk, not the arms; switch sides."
+Back extension (45 degrees),core;lower,strength;endurance,machine,FG,Added 2026-11-12 from the team library (CO-20); a 45-degree bench counts as a machine; unreviewed,hinge,bodyweight,reps,no,"Hips on the pad, lower with a flat back, rise to a straight line and no further."
+Seated calf raise (machine),lower,endurance,machine,FG,Added 2026-11-12 from the team library (LB-31); unreviewed,isolation,weights,reps,no,"Pad on the knees, rise onto the toes, pause, lower slowly."
+Hip abduction (machine),lower,endurance,machine,FG,Added 2026-11-12 from the team library (LB-33); unreviewed,isolation,weights,reps,no,"Press the knees out against the pads, return slowly."
+Hip adduction (machine),lower,endurance,machine,FG,Added 2026-11-12 from the team library (LB-34); unreviewed,isolation,weights,reps,no,"Squeeze the knees together against the pads, return slowly."
+Front squat,lower,strength,barbell;rack,FG,Added 2026-11-12 from the team library (LB-03); unreviewed,squat,barbell,reps,no,"Bar on the front of the shoulders, elbows high, squat deep, drive up."
+Box squat,lower,strength,barbell;rack;box,FG,Added 2026-11-12 from the team library (LB-04); unreviewed,squat,barbell,reps,no,"Sit back onto the box under control, pause, drive up."
+Sumo deadlift,lower;total,strength,barbell,FG,Added 2026-11-12 from the team library (LB-38); unreviewed,hinge,barbell,reps,no,"Wide stance, hands inside the knees, push the floor apart and stand tall."
+Incline barbell bench press,upper,strength,barbell;bench;rack,FG,Added 2026-11-12 from the team library (UB-36); unreviewed,push,barbell,reps,no,"On the incline, lower the bar to the upper chest and press up."
+Close-grip bench press,upper,strength,barbell;bench;rack,FG,Added 2026-11-12 from the team library (UB-38); unreviewed,push,barbell,reps,no,"Hands shoulder-width, elbows close, lower to the lower chest and press."
+Pendlay row,upper,strength,barbell,FG,Added 2026-11-12 from the team library (UB-41); unreviewed,pull,barbell,reps,no,"Back flat and parallel to the floor, pull the bar from the floor to the chest each rep."
+Barbell push press,upper;total,power,barbell;rack,FG,Added 2026-11-12 from the team library (UB-42); unreviewed,push,barbell,reps,no,"Dip the knees, drive the bar overhead with the legs and arms together."
+Barbell curl,upper,endurance,barbell,FG,Added 2026-11-12 from the team library (UB-37); unreviewed,isolation,barbell,reps,no,"Elbows at the sides, curl the bar up without swinging, lower slowly."
+Incline dumbbell press,upper,strength;endurance,bench;db,FG;BG,Added 2026-11-12 from the team library (UB-03); unreviewed,push,weights,reps,no,"Bench at a low incline, press the dumbbells up and together."
+Chest-supported dumbbell row,upper,strength;endurance,bench;db,FG;BG,Added 2026-11-12 from the team library (UB-16); unreviewed,pull,weights,reps,no,"Chest on the incline bench, row both dumbbells to the hips, squeeze."
+Reverse dumbbell fly,upper,endurance,db,FG;BG;DB,Added 2026-11-12 from the team library (UB-27); unreviewed,pull,weights,reps,no,"Hinge forward, raise the dumbbells out to the sides with a slight elbow bend, squeeze the upper back."
+Hammer curl,upper,endurance,db,FG;BG;DB,Added 2026-11-12 from the team library (UB-31); unreviewed,isolation,weights,reps,no,"Palms facing each other, curl without swinging, lower slowly."
+Overhead dumbbell triceps extension,upper,endurance,db,FG;BG;DB,Added 2026-11-12 from the team library (UB-33); unreviewed,isolation,weights,reps,no,"One dumbbell held overhead in both hands, lower behind the head, press up."
+Dumbbell front raise,upper,endurance,db,FG;BG;DB,Added 2026-11-12 from the team library (UB-29); unreviewed,isolation,weights,reps,no,"Raise the dumbbells in front to shoulder height, lower slowly."
+Dumbbell shrug,upper,endurance,db,FG;BG;DB,Added 2026-11-12 from the team library (UB-35); unreviewed,isolation,weights,reps,no,"Dumbbells at the sides, lift the shoulders straight up, pause, lower."
+Dumbbell sumo squat,lower,strength;endurance,db,FG;BG;DB,Added 2026-11-12 from the team library (LB-36); unreviewed,squat,weights,reps,no,"Wide stance, toes out, dumbbell hanging between the legs, squat deep."
+Single-leg Romanian deadlift (dumbbell or kettlebell),lower,strength;endurance,db|kb,FG;BG;DB;KB,Added 2026-11-12 from the team library (LB-12); unreviewed,hinge,weights,reps,no,"Hinge on one leg with the weight hanging, the other leg long behind, stand tall; switch sides."
+Kettlebell deadlift,lower,strength;endurance,kb,FG;KB,Added 2026-11-12 from the team library (LB-11); unreviewed,hinge,weights,reps,no,"Bell between the feet, flat back, stand by driving the hips forward."
+Glute bridge,lower;warmup,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (LB-22); unreviewed,hinge,bodyweight,reps,no,"On the back, feet planted, drive the hips up and squeeze, lower slowly."
+Forward lunge,lower,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (LB-17); unreviewed,lunge,bodyweight,reps,no,"Step forward into a lunge, push back off the front foot to standing."
+Lateral lunge,lower,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (LB-18); unreviewed,lunge,bodyweight,reps,no,"Step wide to one side, sit into that hip with the other leg straight, push back."
+Cossack squat,lower,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (LB-37); unreviewed,lunge,bodyweight,reps,no,"Wide stance, squat to one side with the other leg straight and toes up, shift across."
+Split squat,lower,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (LB-20); unreviewed,lunge,bodyweight,reps,no,"Feet in a long stance, lower straight down, drive up; switch sides."
+Curtsy lunge,lower,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (LB-43); unreviewed,lunge,bodyweight,reps,no,"Step one leg back and across behind the other, lower, push back up."
+Incline push-up,upper,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (UB-05); hands on a bench or chair; unreviewed,push,bodyweight,reps,no,"Hands on a bench or chair, body straight, chest to the edge and back."
+Crunch,core,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (CO-18); unreviewed,flex,bodyweight,reps,yes,"Knees bent, curl the shoulders off the floor, lower slowly."
+Reverse crunch,core,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (CO-17); unreviewed,flex,bodyweight,reps,yes,"Knees bent, curl the hips off the floor toward the chest, lower slowly."
+Superman hold,core,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (CO-21); unreviewed,brace,bodyweight,time,yes,"Face down, lift the arms and legs a little off the floor, hold."
+Plank shoulder tap,core,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (CO-10); unreviewed,brace,bodyweight,reps,yes,"In a push-up plank, tap the opposite shoulder without the hips turning."
+Bear crawl,core;total,endurance,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (CO-23); unreviewed,brace,bodyweight,time,no,"Hands and feet down, knees an inch off the floor, crawl forward with opposite hand and foot."
+Copenhagen plank,core,endurance,bench,FG;BG,Added 2026-11-12 from the team library (CO-25); unreviewed,brace,bodyweight,time,yes,"Side plank with the top foot on the bench, hold; switch sides."
+Cat-cow,warmup;cooldown,-,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (WU-01); unreviewed,mobility,bodyweight,reps,yes,"On hands and knees, round the back, then arch it, slowly."
+Hip circles,warmup,-,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (WU-04); unreviewed,mobility,bodyweight,reps,no,"Hands on the hips, circle them wide in both directions."
+Thoracic rotation (open book),warmup;cooldown,-,none,FG;BG;DB;KB;BW,Added 2026-11-12 from the team library (WU-07); unreviewed,mobility,bodyweight,reps,yes,"Lie on the side with the knees bent, open the top arm to the other side, follow it with the eyes."
+Banded lateral walk,lower,endurance,band,FG,Added 2026-11-12 from the team library (LB-32); Full gym assumes any equipment (Stephen's answer of 2026-11-12); unreviewed,isolation,weights,reps,no,"Band above the knees, quarter squat, step sideways keeping tension; both directions."
+Band pull-apart,upper;warmup,endurance,band,FG,Added 2026-11-12 from the team library (UB-26); Full gym assumes any equipment; unreviewed,pull,weights,reps,no,"Band at chest height, pull it apart until it touches the chest, control it back."
+Suspension row,upper,strength;endurance,suspension,FG,Added 2026-11-12 from the team library (UB-19); Full gym assumes any equipment; unreviewed,pull,bodyweight,reps,no,"Lean back holding the handles with a straight body, pull the chest to the hands."
+Stability-ball rollout,core,strength;endurance,ball,FG,Added 2026-11-12 from the team library (CO-06); Full gym assumes any equipment; unreviewed,brace,bodyweight,reps,yes,"Forearms on the ball, roll it forward as far as the back stays flat, pull back."
+Stability-ball hamstring curl,lower,endurance,ball,FG,Added 2026-11-12 from the team library (LB-28); Full gym assumes any equipment; unreviewed,hinge,bodyweight,reps,no,"Heels on the ball with the hips up, curl the ball in, roll it back slowly."
+Stir-the-pot,core,endurance,ball,FG,Added 2026-11-12 from the team library (CO-08); Full gym assumes any equipment; unreviewed,brace,bodyweight,reps,yes,"Forearms on the ball in a plank, circle them slowly both ways with the hips still."
+Trap-bar deadlift,lower;total,strength,trapbar,FG,Added 2026-11-12 from the team library (LB-10); Full gym assumes any equipment; unreviewed,hinge,barbell,reps,no,"Stand inside the bar, flat back, push the floor away and stand tall."
+Deficit deadlift,lower,strength,barbell;platform,FG,Added 2026-11-12 from the team library (LB-39); Full gym assumes any equipment; unreviewed,hinge,barbell,reps,no,"Stand on a low platform, pull from the extra depth with a flat back."
+Landmine squat,lower,strength;endurance,landmine,FG,Added 2026-11-12 from the team library (LB-41); Full gym assumes any equipment; unreviewed,squat,barbell,reps,no,"Hold the bar end at the chest, squat deep, drive up."
+Half-kneeling landmine press,upper,strength;endurance,landmine,FG,Added 2026-11-12 from the team library (UB-11); Full gym assumes any equipment; unreviewed,push,barbell,reps,no,"Half-kneel, press the bar end up and away at an angle; switch sides."
+T-bar row,upper,strength,landmine,FG,Added 2026-11-12 from the team library (UB-40); Full gym assumes any equipment; unreviewed,pull,barbell,reps,no,"Straddle the bar, hinge, row the handle to the chest, lower under control."
+Dips (parallel bars),upper,strength;endurance,dipbars,FG,Added 2026-11-12 from the team library (UB-08); Full gym assumes any equipment; unreviewed,push,bodyweight,reps,no,"Lower until the shoulders are level with the elbows, press up."
+Nordic hamstring curl,lower,strength,anchor,FG,Added 2026-11-12 from the team library (LB-29); Full gym assumes any equipment; unreviewed,hinge,bodyweight,reps,no,"Heels held, lower the body forward as slowly as you can, push back up with the hands."
+Battle ropes,cardio;upper,endurance;power,ropes,FG,Added 2026-11-12 from the team library (CD-06); Full gym assumes any equipment; unreviewed,cardio,weights,time,no,"Waves with both arms in an athletic stance, keep the ropes moving the whole interval."
+Jump rope,cardio;warmup,endurance,rope,FG,Added 2026-11-12 from the team library (CD-10); Full gym assumes any equipment; unreviewed,cardio,bodyweight,time,no,"Light bounces, the wrists turn the rope, steady rhythm."
+Air bike,cardio,endurance;strength;power,airbike,FG,Added 2026-11-12 from the team library (CD-02); Full gym assumes any equipment; unreviewed,cardio,weights,time,no,"Push and pull the arms as you pedal; the harder you go, the harder it gets."
 `;

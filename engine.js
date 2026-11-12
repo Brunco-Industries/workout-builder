@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.5.6'; // A18: a backup reminder when entries sit on the phone without a download
+  const APP_VERSION = '0.5.7'; // B1, B2, B4, B5, B7: the library grows to 180 rows with load_class, dose, cooldown and cue; the engine reads them
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -51,7 +51,8 @@
     cardio: { strengthHardMin: 2, strengthEasyMin: 1, powerOnSec: 20, powerOffSec: 100,
       effort: { endurance: 'a pace where you can speak in short sentences', strength: 'high resistance or a steep grade; hard but controlled', power: 'all-out on the work, fully easy on the recovery' } },
     coolDownCore: { stationSeconds: 45, changeSeconds: 15 },
-    warmUp: { firstItemMinutesWhenFiveOrMore: 2 }
+    warmUp: { firstItemMinutesWhenFiveOrMore: 2 },
+    carry: { distance: 'about 40 m' } // a team figure (library review, 2026-11-12): carries and the sled are counted by distance
   };
 
   /* Warm-up and stretch choices by focus. Names must exist in the library; a struck row is skipped. */
@@ -108,13 +109,19 @@
     const rows = parseCSV(csvText);
     if (!rows.length) throw new Error('The exercise library is empty.');
     const header = rows[0];
-    ['exercise', 'focus', 'types', 'needs', 'allowed_equipment', 'notes', 'pattern'].forEach(h => {
+    ['exercise', 'focus', 'types', 'needs', 'allowed_equipment', 'notes', 'pattern', 'load_class', 'dose', 'cooldown', 'cue'].forEach(h => {
       if (header.indexOf(h) < 0) throw new Error('exercise-library.csv is missing the column "' + h + '".');
     });
     const col = name => header.indexOf(name);
+    const LOAD_CLASSES = ['barbell', 'weights', 'bodyweight'], DOSES = ['reps', 'time', 'distance'];
     return rows.slice(1).map((r, i) => {
       const name = r[col('exercise')];
       const pattern = r[col('pattern')];
+      const loadClass = r[col('load_class')], dose = r[col('dose')], cooldown = r[col('cooldown')];
+      // The library's own columns say how a row is counted and where it may appear (source-note.md, version 2); a row outside the lists is refused, never guessed.
+      if (!LOAD_CLASSES.includes(loadClass)) throw new Error('exercise-library.csv row ' + (i + 2) + ' ("' + name + '") has load_class "' + loadClass + '", not barbell, weights or bodyweight.');
+      if (!DOSES.includes(dose)) throw new Error('exercise-library.csv row ' + (i + 2) + ' ("' + name + '") has dose "' + dose + '", not reps, time or distance.');
+      if (cooldown !== 'yes' && cooldown !== 'no') throw new Error('exercise-library.csv row ' + (i + 2) + ' ("' + name + '") has cooldown "' + cooldown + '", not yes or no.');
       return {
         index: i,
         name,
@@ -124,9 +131,14 @@
         allowed: r[col('allowed_equipment')].split(';').filter(Boolean),
         notes: r[col('notes')] || '',
         pattern,
-        timed: pattern === 'brace' || pattern === 'carry' || /\b(hold|sit|plank|carry)\b/i.test(name),
+        loadClass,
+        dose,
+        timed: dose === 'time',
+        distance: dose === 'distance',
+        cooldownOk: cooldown === 'yes',
+        cue: r[col('cue')] || '',
         // one-sided moves get "per side" / "switch sides"; lunges, step-ups and bird dogs alternate within the set
-        perSide: /one-arm|single-leg|suitcase|split squat|side plank|get-up|woodchop|pallof/i.test(name)
+        perSide: /one-arm|single-leg|suitcase|split squat|side plank|get-up|woodchop|pallof|copenhagen/i.test(name)
       };
     });
   }
@@ -333,7 +345,8 @@
   function prescribe(row, sessionType, sets, rest) {
     const t = row.types.includes(sessionType) ? sessionType : (row.types[0] || sessionType);
     let work;
-    if (t === 'strength') work = row.timed ? TIMING.strength.hold : TIMING.strength.reps;
+    if (row.distance) work = TIMING.carry.distance;
+    else if (t === 'strength') work = row.timed ? TIMING.strength.hold : TIMING.strength.reps;
     else if (t === 'power') work = row.timed ? TIMING.power.hold : (row.pattern === 'jump' ? TIMING.power.jumps : TIMING.power.reps);
     else work = row.timed ? TIMING.endurance.stationSeconds + ' s' : TIMING.endurance.reps;
     return sets + ' × ' + work + (row.perSide ? ' per side' : '') + (rest ? ' · rest ' + rest : '');
@@ -452,7 +465,7 @@
   }
   function coreBlock(ctx, minCore, usedNames) {
     const c = TIMING.coolDownCore;
-    const corePool = ctx.library.filter(r => r.focus.includes('core') && rowAllowed(r, ctx.sel.equipment, ctx.sel.machines));
+    const corePool = ctx.library.filter(r => r.focus.includes('core') && r.cooldownOk && rowAllowed(r, ctx.sel.equipment, ctx.sel.machines)); // cooldown: no keeps heart-rate moves out (library review, 2026-11-12)
     const ordered = corePool.filter(r => r.types.includes('endurance')).concat(corePool.filter(r => !r.types.includes('endurance')));
     const unused = ordered.filter(r => !usedNames.has(r.name));
     const seq = unused.length >= minCore ? unused : unused.concat(ordered.filter(r => usedNames.has(r.name)));
@@ -576,12 +589,13 @@
     [].concat(w.warmup, w.main.items, w.cooldown.stretch).forEach(i => { if (seen.has(i.name)) v.push('"' + i.name + '" repeats'); seen.add(i.name); });
     const coreRepeats = w.cooldown.core.items.filter(i => seen.has(i.name));
     if (coreRepeats.length && !w.notes.some(n => /cool-down core repeats/.test(n))) v.push('cool-down core repeats without saying so');
+    w.cooldown.core.items.forEach(i => { const row = findRow(library, i.name); if (row && !row.cooldownOk) v.push('"' + i.name + '" is flagged cooldown: no'); });
     if (WEIGHT_RE.test(w.text)) v.push('a weight is stated');
     if (PUSH_THROUGH_RE.test(w.text)) v.push('"push through" language');
     if (w.text.indexOf(SAFETY_LINE) < 0) v.push('safety line missing');
     if (w.main.kind === 'pairs' && w.selections.type === 'strength' && !w.header.typeChanged) {
       if (!w.main.items.some(i => /^A1$/.test(i.tag)) || !w.main.items.some(i => /^A2$/.test(i.tag))) v.push('strength block has no A1/A2 pair');
-      w.main.items.forEach(i => { const row = findRow(library, i.name); if (row && row.types.includes('strength') && !/3–6|20–30 s/.test(i.text)) v.push('"' + i.name + '" is not dosed 3–6 reps'); });
+      w.main.items.forEach(i => { const row = findRow(library, i.name); if (row && row.types.includes('strength') && !/3–6|20–30 s|about 40 m/.test(i.text)) v.push('"' + i.name + '" is not dosed 3–6 reps, a hold or a distance'); });
     }
     return v;
   }
