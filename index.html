@@ -102,8 +102,8 @@
   .backup ul{margin:6px 0 0;padding-left:1.1rem;font-size:.86rem;color:var(--warn)}
   .update{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .update button{font:inherit;font-size:.86rem;font-weight:700;border:1px solid var(--note-line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 10px}
-  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-ink);padding:10px 14px;border-radius:10px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
-  .toast.show{opacity:1}
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-ink);padding:10px 14px;border-radius:10px;font-size:.9rem;opacity:0;visibility:hidden;pointer-events:none;z-index:9} /* no transition: shown and hidden are plain states, the same in every browser */
+  .toast.show{opacity:1;visibility:visible}
   .footer{color:var(--muted);font-size:.8rem;margin-top:20px}
 </style>
 </head>
@@ -254,8 +254,13 @@
   };
   renderStorageBanner();
 
-  let toastTimer;
-  function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 1800); }
+  /* A toast lasts about two seconds, and goes sooner on the next tap or scroll, so a message never outstays what it was about. */
+  let toastTimer = null;
+  const hideToast = () => { $('toast').classList.remove('show'); toastTimer = null; };
+  function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 2200); }
+  const soonHideToast = () => { if (toastTimer) { clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 350); } };
+  document.addEventListener('pointerdown', soonHideToast, true);
+  window.addEventListener('scroll', soonHideToast, { passive: true });
 
   /* ---------- story 1: the goal and this week's count ---------- */
   function renderGoal() {
