@@ -180,7 +180,13 @@
     if (!E.isDate(d.date) || d.date > E.todayIn()) return null;
     if (!E.TIMES.includes(s.time) || !E.EQUIPMENT.some(e => e.key === s.equipment) || !E.FOCUS.some(f => f.key === s.focus) || !E.TYPES.some(t => t.key === s.type)) return null;
     const machines = Array.isArray(s.machines) ? s.machines.filter(m => E.MACHINES.includes(m)) : [];
-    return { date: d.date, sel: { time: s.time, equipment: s.equipment, machines, focus: s.focus, type: s.type } };
+    const p = { date: d.date, sel: { time: s.time, equipment: s.equipment, machines, focus: s.focus, type: s.type } };
+    // The workout as shown, with his swaps, is kept only when this version built it and it still passes the audit; otherwise it is rebuilt.
+    const r = d.result;
+    if (r && typeof r === 'object' && r.version === E.APP_VERSION && r.check && r.check.ok && r.main && Array.isArray(r.main.segments)) {
+      try { if (E.audit(r, LIB).length === 0) p.result = r; } catch (e) { /* an unreadable stored build is simply rebuilt */ }
+    }
+    return p;
   }
   /* The remembered set-up: the last selections and the machine ticks per gym. Anything not in the allowed lists is dropped, never defaulted. */
   function sanitizeSetup(d) {
@@ -240,10 +246,10 @@
     S.sel.machines = S.sel.equipment ? rememberedMachines(S.sel.equipment) : [];
   }
   S.offered = false;
-  if (ST.pending) { // the unlogged build comes back on screen, rebuilt from its own selections and date, so that what is logged is what is shown
+  if (ST.pending) { // the unlogged build comes back on screen: the very workout he saw, with his swaps, when this version built it; else rebuilt from its selections and date
     try {
       S.sel = { time: ST.pending.sel.time, equipment: ST.pending.sel.equipment, machines: ST.pending.sel.machines.slice(), focus: ST.pending.sel.focus, type: ST.pending.sel.type };
-      S.result = E.buildWorkout(LIB, S.sel, ST.log, ST.pending.date); S.stale = false; S.offered = true;
+      S.result = (ST.pending.result && ST.pending.result.version === E.APP_VERSION) ? ST.pending.result : E.buildWorkout(LIB, S.sel, ST.log, ST.pending.date); S.stale = false; S.offered = true;
     } catch (e) { ST.pending = null; S.result = null; }
   }
   const today = () => E.todayIn();
@@ -357,7 +363,7 @@
     try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today()); S.stale = false; S.swapping = false; }
     catch (e) { S.result = null; $('resultArea').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; $('logArea').innerHTML = ''; return; }
     ST.lastId = null; // a new workout on screen: the previous entry stays recorded, but Undo now belongs to the next one
-    ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type } }; S.offered = false;
+    ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type }, result: S.result }; S.offered = false;
     saveState();
     renderResult(); renderLog();
     const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -375,9 +381,10 @@
     const stale = S.stale ? '<div class="stale-note">Selections changed. Tap Build to refresh. The workout below is for the previous selections and cannot be logged.</div>' :
       (S.offered ? '<div class="stale-note">Built on ' + esc(E.longDate(w.date)) + ' and not logged. Log it below, or <button type="button" class="linkbtn" id="dismissBtn">dismiss it</button>.</div>' : '');
     // The main block is one or more segments (decision 4): each with its own intro, rows and tail. Older stored builds have no segments list.
+    // Each main exercise carries a swap control (decision 5): the next allowed row of the same pattern and load class. It replaces "Also fits".
+    const swapBtn = i => S.stale ? '' : ' <button type="button" class="linkbtn swapbtn" data-name="' + esc(i.name) + '" aria-label="Swap ' + esc(i.name) + '">swap</button>';
     const segHtml = (w.main.segments || [w.main]).map(s => '<p class="note">' + esc(s.intro) + '</p><ol>' +
-      s.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>' +
-      (s.alternatives && s.alternatives.length ? '<p class="small">Also fits: ' + esc(s.alternatives.join(', ')) + '</p>' : '') +
+      s.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + swapBtn(i) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>' +
       (s.tail ? '<p class="small">' + esc(s.tail) + '</p>' : '')).join('');
     el.innerHTML = stale + '<div class="result' + (S.stale ? ' stale' : '') + '">' +
       '<p class="title">' + esc(w.header.focus) + ' · ' + esc(w.header.type) + (w.header.typeChanged ? ' <span class="sub">(you chose ' + esc(w.header.chosenType) + ')</span>' : '') + ' · ' + w.header.total + ' min</p>' +
@@ -391,6 +398,13 @@
       '<div class="meta"><div>Last trained ' + esc(w.header.focus) + ': <b>' + (lt ? esc(E.longDate(lt)) : 'no record yet') + '</b></div>' +
       '<div>This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b> workouts' + (ST.goal === null ? ' logged · no goal set yet' : '') + '</div></div></div>';
     if ($('dismissBtn')) $('dismissBtn').onclick = () => { ST.pending = null; S.offered = false; S.result = null; saveState(); renderResult(); renderLog(); toast('Dismissed. Nothing was logged.'); };
+    el.querySelectorAll('.swapbtn').forEach(b => b.onclick = () => {
+      if (S.stale || !S.result) return;
+      const r = E.swapExercise(LIB, S.result, b.getAttribute('data-name'));
+      if (!r) { toast('No other exercise of that pattern and load fits here.'); return; }
+      S.result = r; if (ST.pending) ST.pending.result = r; saveState(); renderResult();
+      toast('Swapped in ' + r.swaps[r.swaps.length - 1].to + '.');
+    });
   }
 
   /* ---------- story 3: log it, see the row, undo ---------- */

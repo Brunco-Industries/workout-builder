@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.5'; // C4: caps (5 rounds per pair, 4 per circuit) and the fill with the next type; the main block as segments (decision 4)
+  const APP_VERSION = '0.6.6'; // C6: a swap control on every main exercise (decision 5)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -424,7 +424,7 @@
     const capped = R > cap;
     if (capped) R = cap;
     const rampText = row => row.loadClass === 'barbell' ? '1 min ramp-up, then ' : '';
-    const withSets = (it, n) => { it.sets = n; return it; };
+    const withSets = (it, n) => { it.sets = n; it.rest = rest; return it; }; // kept on the item so a swap can re-prescribe the same dose
     if (single) {
       items.push(withSets(item('1', single, rampText(single) + prescribe(single, type, R, rest)), R));
       roundsPerPair = [R];
@@ -669,6 +669,41 @@
     return L.join('\n');
   }
 
+  /* ---------- swap (workout-rules.md §8, decision 5 of 2026-11-12) ----------
+     Replace one main exercise with the next allowed row, in library order and wrapping, of the same pattern and load class that is not
+     already in the workout. The sum, the doses, the pairing rules and the order hold because the replacement shares the row's pattern and
+     load class; a cardio modality swaps to the next alternative. Returns the changed workout, or null when no other row fits. */
+  function swapExercise(library, w, name) {
+    const sel = w.selections;
+    const segs = w.main.segments || [w.main];
+    let seg = null, k = -1;
+    segs.forEach(s => { if (seg) return; const i = s.items.findIndex(it => it.name === name); if (i >= 0) { seg = s; k = i; } });
+    const cur = seg ? findRow(library, name) : null;
+    if (!cur) return null;
+    const usedNames = new Set([].concat(w.warmup, w.main.items, w.cooldown.stretch, w.cooldown.core.items).map(i => i.name));
+    let partner = null;
+    if (seg.kind === 'pairs') { const m = /^([A-Z])([12])$/.exec(seg.items[k].tag); const other = m && seg.items.find(it => it.tag === m[1] + (m[2] === '1' ? '2' : '1')); partner = other ? findRow(library, other.name) : null; }
+    const segType = seg.type || sel.type;
+    let base = seg.kind === 'cardio' ? poolFor(library, sel, 'cardio', segType) : poolFor(library, sel, sel.focus, segType);
+    if (seg.kind !== 'cardio' && sel.focus === 'total') base = base.concat(upperLowerRows(library, sel, segType).filter(r => !base.some(b => b.name === r.name)));
+    const fits = r => r.name !== cur.name && !usedNames.has(r.name) && (seg.kind === 'cardio' || (r.pattern === cur.pattern && r.loadClass === cur.loadClass)) && (!partner || canPair(partner, r));
+    const cands = base.filter(fits).sort((a, b) => a.index - b.index);
+    if (!cands.length) return null;
+    const next = cands.find(r => r.index > cur.index) || cands[0];
+    const it = seg.items[k], old = it.name;
+    it.name = next.name; it.note = next.notes; it.pattern = next.pattern;
+    if (seg.kind === 'pairs') it.text = (next.loadClass === 'barbell' ? '1 min ramp-up, then ' : '') + prescribe(next, segType, it.sets, it.rest);
+    else if (seg.kind === 'circuit') it.text = seg.rounds + ' × ' + TIMING.endurance.stationSeconds + ' s' + (next.perSide ? ', switch sides halfway' : '');
+    seg.used = seg.items.map(i => i.name);
+    if (seg.kind === 'cardio') seg.alternatives = base.filter(r => r.name !== next.name).map(r => r.name);
+    w.main.items = [].concat.apply([], segs.map(s => s.items));
+    w.main.used = w.main.items.map(i => i.name);
+    if (segs.length === 1 && seg.kind === 'cardio') w.main.alternatives = seg.alternatives;
+    w.swaps = (w.swaps || []).concat([{ from: old, to: next.name }]);
+    w.text = workoutText(w);
+    return w;
+  }
+
   /* ---------- audit: the checks a reviewer runs on any generated workout ---------- */
   const WEIGHT_RE = /\b\d+(\.\d+)?\s?(kg|kgs|kilo|kilos|lb|lbs|pound|pounds)\b/i;
   const PUSH_THROUGH_RE = /push(ing)? through/i;
@@ -739,7 +774,7 @@
     blockMinutes, parseISO, isDate, addDays, mondayOf, dayIndex, todayIn, longDate,
     weeklyCount, lastTrained, focusCount,
     validateSelections, validateGoal, validateLogRow, serializeLog, parseLog,
-    allowedExercises, buildWorkout, workoutText, audit, wholeBodyLift, canPair, loadRank,
+    allowedExercises, buildWorkout, workoutText, audit, swapExercise, wholeBodyLift, canPair, loadRank,
     equipLabel, focusLabel, typeLabel
   };
 })(typeof window !== 'undefined' ? window : this);
