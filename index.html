@@ -71,7 +71,8 @@
   .safety{font-size:.9rem;background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:10px;padding:8px 10px;margin:8px 0}
   .meta{font-size:.95rem;margin:8px 0;display:grid;gap:4px}
   /* log */
-  .logwrap{position:sticky;bottom:0;background:var(--bg);padding:8px 0 calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);margin-top:8px}
+  #logArea.sticky{position:sticky;bottom:0;z-index:2} /* sticks within #session, so the bar stays in view while the workout scrolls */
+  .logwrap{background:var(--bg);padding:8px 0 calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);margin-top:8px}
   .logbar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
   .logbar button{font:inherit;font-size:.9rem;font-weight:700;padding:12px 4px;border-radius:10px;border:1px solid var(--accent);background:var(--card);color:var(--accent);min-height:44px}
   .logbar button:first-child{background:var(--accent);color:#fff}
@@ -110,8 +111,10 @@
   <button class="btn" id="buildBtn" type="button" disabled>Choose time, equipment, focus and type</button>
   <p class="hint" id="splitHint"></p>
 
-  <div id="resultArea"></div>
-  <div id="logArea"></div>
+  <div id="session">
+    <div id="resultArea"></div>
+    <div id="logArea"></div>
+  </div>
 
   <section class="card backup" id="backup">
     <h3>Log backup</h3>
@@ -279,6 +282,7 @@
   const lastEntry = () => ST.lastId ? ST.log.find(r => r.id === ST.lastId) || null : null;
   function renderLog() {
     const el = $('logArea');
+    el.classList.remove('sticky'); // sticky only while the log bar itself is on screen, never the recorded card
     const entry = lastEntry();
     if (entry) { renderRecorded(el, entry); return; }
     const canLog = S.result && !S.stale;
@@ -299,6 +303,7 @@
       $('swCancel').onclick = () => { S.swapping = false; renderLog(); };
       return;
     }
+    el.classList.add('sticky');
     el.innerHTML = '<div class="logwrap"><span class="lbl">Log this workout</span><div class="logbar">' +
       '<button type="button" data-status="done">Done</button><button type="button" data-status="shortened">Shortened</button><button type="button" data-status="swapped">Swapped</button><button type="button" data-status="skipped">Skipped</button></div></div>';
     el.querySelectorAll('[data-status]').forEach(b => {

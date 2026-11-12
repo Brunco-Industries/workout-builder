@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.0'; // Full gym benchmarked: elliptical, stair climber and sled join the machine ticks; two stair-climber rows
+  const APP_VERSION = '0.4.1'; // A1: the log bar sticks while the workout is on screen
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
