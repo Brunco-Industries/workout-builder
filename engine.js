@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.6'; // A6: the iPhone note, Safari and the home-screen app keep separate logs
+  const APP_VERSION = '0.4.7'; // A7: chips and the time stepper update in place, so keyboard focus survives a tap
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

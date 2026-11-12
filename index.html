@@ -255,28 +255,37 @@
   }
 
   /* ---------- story 2: the selections and the workout ---------- */
+  /* Chips are built once and updated in place, so the button that was tapped keeps keyboard focus. */
   function chipRow(id, list, isOn, onTap) {
-    const c = $(id); c.innerHTML = '';
-    list.forEach(([key, text]) => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = text;
-      b.setAttribute('aria-pressed', isOn(key) ? 'true' : 'false'); b.onclick = () => onTap(key); c.appendChild(b);
-    });
+    const c = $(id);
+    const same = c.children.length === list.length && list.every(([key], i) => c.children[i].dataset.key === String(key));
+    if (!same) {
+      c.innerHTML = '';
+      list.forEach(([key, text]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = text; b.dataset.key = String(key); c.appendChild(b);
+      });
+    }
+    list.forEach(([key], i) => { const b = c.children[i]; b.setAttribute('aria-pressed', isOn(key) ? 'true' : 'false'); b.onclick = () => onTap(key); });
   }
   function changed() { if (S.result) S.stale = true; S.swapping = false; rememberSetup(); renderSelectors(); renderBuild(); renderResult(); renderLog(); }
   /* Time: a stepper in 5-minute steps with quick picks. Only values in E.TIMES can be produced; validation is unchanged. */
   function renderTime() {
-    const c = $('timeChips'); c.innerHTML = '';
+    const c = $('timeChips');
     const t = S.sel.time, idx = t === null ? -1 : E.TIMES.indexOf(t);
-    const mk = (txt, cls, dis, on, pressed, label) => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = txt; b.disabled = !!dis;
-      if (pressed !== undefined) b.setAttribute('aria-pressed', pressed ? 'true' : 'false'); if (label) b.setAttribute('aria-label', label); b.onclick = on; return b;
-    };
-    c.appendChild(mk('−5', 'chip step', idx <= 0, () => { S.sel.time = E.TIMES[idx - 1]; changed(); }, undefined, '5 minutes less'));
-    const v = document.createElement('span'); v.className = 'val'; v.textContent = t === null ? 'not set' : t + ' min'; c.appendChild(v);
-    c.appendChild(mk('+5', 'chip step', idx >= E.TIMES.length - 1, () => { S.sel.time = E.TIMES[idx < 0 ? 0 : idx + 1]; changed(); }, undefined, '5 minutes more'));
-    const quick = document.createElement('div'); quick.className = 'quick';
-    [15, 30, 45, 60, 90, 120].forEach(q => quick.appendChild(mk(String(q), 'chip', false, () => { S.sel.time = q; changed(); }, t === q)));
-    c.appendChild(quick);
+    if (!c.querySelector('.val')) { // built once; updated in place after that
+      const mk = (txt, cls, label) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = txt; if (label) b.setAttribute('aria-label', label); return b; };
+      c.appendChild(mk('−5', 'chip step', '5 minutes less'));
+      const v = document.createElement('span'); v.className = 'val'; c.appendChild(v);
+      c.appendChild(mk('+5', 'chip step', '5 minutes more'));
+      const quick = document.createElement('div'); quick.className = 'quick';
+      [15, 30, 45, 60, 90, 120].forEach(q => { const b = mk(String(q), 'chip'); b.dataset.key = String(q); quick.appendChild(b); });
+      c.appendChild(quick);
+    }
+    const steps = c.querySelectorAll('.step'), minus = steps[0], plus = steps[1];
+    minus.disabled = idx <= 0; minus.onclick = () => { S.sel.time = E.TIMES[idx - 1]; changed(); };
+    plus.disabled = idx >= E.TIMES.length - 1; plus.onclick = () => { S.sel.time = E.TIMES[idx < 0 ? 0 : idx + 1]; changed(); };
+    c.querySelector('.val').textContent = t === null ? 'not set' : t + ' min';
+    c.querySelectorAll('.quick .chip').forEach(b => { const q = Number(b.dataset.key); b.setAttribute('aria-pressed', t === q ? 'true' : 'false'); b.onclick = () => { S.sel.time = q; changed(); }; });
   }
   function renderSelectors() {
     renderTime();
