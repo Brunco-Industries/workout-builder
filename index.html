@@ -103,7 +103,7 @@
 
   <p class="needs" id="needsLine">To build a workout the app needs: time, equipment, focus and type.</p>
   <div class="row"><span class="lbl">Time (minutes, includes warm-up and cool-down)</span><div class="chips scroll" id="timeChips"></div></div>
-  <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div></div>
+  <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div><p class="hint" style="margin:6px 0 0">Bodyweight moves are included with every option.</p></div>
   <div class="row" id="machineRow" hidden><span class="lbl">Machines here (tick any)</span><div class="chips" id="machineChips"></div></div>
   <div class="row"><span class="lbl">Focus</span><div class="chips" id="focusChips"></div></div>
   <div class="row"><span class="lbl">Type</span><div class="chips" id="typeChips"></div></div>
@@ -182,7 +182,7 @@
   const ST = loadState();
   const S = { sel: { time: null, equipment: null, machines: [], focus: null, type: null }, result: null, stale: false, swapping: false, goalEditing: false, importUndo: null };
   const today = () => E.todayIn();
-  $('footer').textContent = 'deliverables/app · engine ' + E.APP_VERSION + ' · spec ' + E.SPEC_VERSION + ' · today ' + today() + ' (America/Edmonton) · the log stays on this phone';
+  $('footer').textContent = 'Workout builder ' + E.APP_VERSION + ' · the log stays on this phone';
   renderStorageBanner();
 
   let toastTimer;
@@ -240,9 +240,9 @@
     const m = missing(), b = $('buildBtn'), h = $('splitHint');
     if (m.length) { b.disabled = true; b.textContent = 'Choose ' + joinAnd(m); $('needsLine').textContent = 'Still needed: ' + joinAnd(m) + '.'; h.textContent = ''; return; }
     const bm = E.blockMinutes(S.sel.time);
-    b.disabled = false; b.textContent = 'Build workout · ' + bm.warmup + ' / ' + bm.main + ' / ' + bm.cooldown;
+    b.disabled = false; b.textContent = 'Build the ' + S.sel.time + '-minute workout';
     $('needsLine').textContent = 'All four chosen.';
-    h.textContent = 'Core in the cool-down: at least ' + bm.minCore + ' min.';
+    h.textContent = 'Warm-up ' + bm.warmup + ' min · main block ' + bm.main + ' min · cool-down ' + bm.cooldown + ' min, ending with at least ' + bm.minCore + ' min of core.';
   }
   $('buildBtn').onclick = () => {
     try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today()); S.stale = false; S.swapping = false; }
@@ -258,6 +258,8 @@
     const el = $('resultArea');
     if (!S.result) { el.innerHTML = ''; return; }
     const w = S.result, b = w.blocks;
+    // The must-never guard: a workout whose blocks do not sum, or whose core is short, is never shown and never logged.
+    if (!w.check.ok) { el.innerHTML = '<div class="err">This workout does not add up (' + w.check.sum + ' of ' + w.check.total + ' min, core ' + w.check.coreMinutes + ' of ' + w.check.minCore + ') and will not be shown. Change a selection and build again.</div>'; return; }
     const lt = E.lastTrained(ST.log, w.selections.focus, { before: w.date });
     const count = E.weeklyCount(ST.log, today());
     const stale = S.stale ? '<div class="stale-note">Selections changed. Tap Build to refresh. The workout below is for the previous selections and cannot be logged.</div>' : '';
@@ -272,7 +274,6 @@
         (w.main.tail ? '<p class="small">' + esc(w.main.tail) + '</p>' : '') + '</section>' +
       '<section class="block"><h4>Cool-down <span class="min">' + b.cooldown + ' min</span></h4>' + list(w.cooldown.stretch) +
         '<div class="core"><h5>Core <span class="min">' + w.cooldown.core.minutes + ' min</span></h5>' + list(w.cooldown.core.items) + '<p class="small" style="margin-top:4px">' + esc(w.cooldown.core.tail) + '</p></div></section>' +
-      '<p class="check">Block check: ' + b.warmup + ' + ' + b.main + ' + ' + b.cooldown + ' = ' + w.check.sum + ' min ' + (w.check.sum === w.check.total ? '✓' : '✗') + ' · core ' + w.check.coreMinutes + ' ≥ ' + w.check.minCore + ' ' + (w.check.coreMinutes >= w.check.minCore ? '✓' : '✗') + '</p>' +
       '<p class="safety">' + esc(w.safety) + '</p>' +
       '<div class="meta"><div>Last trained ' + esc(w.header.focus) + ': <b>' + (lt ? esc(E.longDate(lt)) : 'no record yet') + '</b></div>' +
       '<div>This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b> workouts' + (ST.goal === null ? ' logged · no goal set yet' : '') + '</div></div></div>';
@@ -285,7 +286,7 @@
     el.classList.remove('sticky'); // sticky only while the log bar itself is on screen, never the recorded card
     const entry = lastEntry();
     if (entry) { renderRecorded(el, entry); return; }
-    const canLog = S.result && !S.stale;
+    const canLog = S.result && !S.stale && S.result.check.ok;
     if (!canLog) { el.innerHTML = ''; return; }
     if (S.swapping) {
       el.innerHTML = '<div class="card"><h3>Swapped: what did you do instead?</h3>' +
@@ -311,7 +312,7 @@
     });
   }
   function record(status, swapped) {
-    if (!S.result || S.stale) return; // never log a workout other than the one on screen
+    if (!S.result || S.stale || !S.result.check.ok) return; // never log a workout other than the one on screen, and never one that does not add up
     const w = S.result, d = today();
     const row = {
       id: newId(), date: d, week_start: E.mondayOf(d), time_selected_min: w.selections.time, equipment: w.selections.equipment,
@@ -327,10 +328,12 @@
   function renderRecorded(el, row) {
     const count = E.weeklyCount(ST.log, today());
     const counts = row.status === 'skipped' ? 'Skipped does not count toward the goal.' : 'Counts toward this week.';
+    const eqLabel = (E.EQUIPMENT.find(e => e.key === row.equipment) || {}).label || row.equipment;
+    const savedLine = () => 'Saved on this phone: ' + E.longDate(row.date) + ' · ' + row.time_selected_min + ' min · ' + eqLabel + '. Nothing was sent anywhere.';
     el.innerHTML = '<div class="recorded"><h3>Recorded · ' + esc(E.focusLabel(row.focus)) + ' · ' + esc(E.typeLabel(row.type)) + ' · ' + esc(row.status) + '</h3>' +
       '<p class="ok" id="recCount">' + counts + ' This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b>.</p>' +
-      '<p class="hint" style="margin:8px 0 4px">This is the row saved on this phone, in the <code>training-log.csv</code> format. Nothing was sent anywhere.</p>' +
-      '<table class="rowtbl" id="rowTbl"></table>' +
+      '<p class="hint" id="recSaved" style="margin:8px 0 4px">' + esc(savedLine()) + '</p>' +
+      '<details><summary class="hint">Show the saved row</summary><table class="rowtbl" id="rowTbl"></table></details>' +
       '<div class="field"><label for="dateIn" class="lbl">Date trained</label><input id="dateIn" type="date" value="' + esc(row.date) + '" max="' + esc(today()) + '"></div>' +
       '<div class="field"><label for="minIn" class="lbl">Actual minutes</label><input id="minIn" type="number" inputmode="numeric" min="1" max="300" placeholder="optional, blank stays blank" value="' + esc(row.actual_min) + '"></div>' +
       '<div class="field"><label for="noteIn" class="lbl">Note</label><input id="noteIn" type="text" placeholder="optional, your words" value="' + esc(row.note) + '"></div>' +
@@ -338,6 +341,7 @@
       '<button class="btn ghost" id="undoBtn" type="button">Undo this entry</button></div>';
     const tbl = () => {
       $('rowTbl').innerHTML = E.LOG_FIELDS.map(k => '<tr><td>' + k + '</td><td>' + (row[k] === '' ? '<span class="hint">blank</span>' : esc(row[k])) + '</td></tr>').join('');
+      $('recSaved').textContent = savedLine();
     };
     const refreshCount = () => { const c = E.weeklyCount(ST.log, today()); $('recCount').innerHTML = counts + ' This week: <b>' + c + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b>.'; };
     tbl();

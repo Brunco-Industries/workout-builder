@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.1'; // A1: the log bar sticks while the workout is on screen
+  const APP_VERSION = '0.4.2'; // A2: user-facing wording; the block-sum guard kept in code, the line hidden
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
