@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.11'; // A11: Download and Share are separate controls; the share sheet no longer hides the download
+  const APP_VERSION = '0.5.0'; // A12: a built workout that was not logged is kept and offered on the next open; end of phase A
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

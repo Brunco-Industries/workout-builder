@@ -26,6 +26,7 @@
   .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .navbtn{font:inherit;font-size:.9rem;font-weight:700;border:1px solid var(--accent);background:var(--card);color:var(--accent);border-radius:999px;padding:6px 14px;min-height:36px}
   .navbtn[aria-pressed=true]{background:var(--accent);color:#fff}
+  .linkbtn{font:inherit;background:none;border:0;color:inherit;text-decoration:underline;padding:0;cursor:pointer}
   #youView .backup{margin-top:4px}
   .row{margin:10px 0}
   .lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
@@ -168,7 +169,16 @@
 
   /* ---------- the record: localStorage, one key; nothing leaves the phone ---------- */
   const KEY = 'workout-builder:v1';
-  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [], setup: null });
+  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [], setup: null, pending: null });
+  /* A built workout that was not logged: its selections and date are kept so it can be offered on the next open. Never logged on its own. */
+  function sanitizePending(d) {
+    if (!d || typeof d !== 'object' || !d.sel || typeof d.sel !== 'object') return null;
+    const s = d.sel;
+    if (!E.isDate(d.date) || d.date > E.todayIn()) return null;
+    if (!E.TIMES.includes(s.time) || !E.EQUIPMENT.some(e => e.key === s.equipment) || !E.FOCUS.some(f => f.key === s.focus) || !E.TYPES.some(t => t.key === s.type)) return null;
+    const machines = Array.isArray(s.machines) ? s.machines.filter(m => E.MACHINES.includes(m)) : [];
+    return { date: d.date, sel: { time: s.time, equipment: s.equipment, machines, focus: s.focus, type: s.type } };
+  }
   /* The remembered set-up: the last selections and the machine ticks per gym. Anything not in the allowed lists is dropped, never defaulted. */
   function sanitizeSetup(d) {
     if (!d || typeof d !== 'object') return null;
@@ -201,6 +211,7 @@
     st.quarantine = st.quarantine.concat(Array.isArray(d.quarantine) ? d.quarantine : []);
     st.lastId = st.log.some(r => r.id === d.lastId) ? d.lastId : null;
     st.setup = sanitizeSetup(d.setup);
+    st.pending = sanitizePending(d.pending);
     return st;
   }
   function saveState(keepImportUndo) {
@@ -223,6 +234,13 @@
   if (ST.setup) { // the last set-up comes back; the workout itself does not, so nothing stale can be logged
     S.sel.time = ST.setup.time; S.sel.equipment = ST.setup.equipment; S.sel.focus = ST.setup.focus; S.sel.type = ST.setup.type;
     S.sel.machines = S.sel.equipment ? rememberedMachines(S.sel.equipment) : [];
+  }
+  S.offered = false;
+  if (ST.pending) { // the unlogged build comes back on screen, rebuilt from its own selections and date, so that what is logged is what is shown
+    try {
+      S.sel = { time: ST.pending.sel.time, equipment: ST.pending.sel.equipment, machines: ST.pending.sel.machines.slice(), focus: ST.pending.sel.focus, type: ST.pending.sel.type };
+      S.result = E.buildWorkout(LIB, S.sel, ST.log, ST.pending.date); S.stale = false; S.offered = true;
+    } catch (e) { ST.pending = null; S.result = null; }
   }
   const today = () => E.todayIn();
   $('footer').textContent = 'Workout builder ' + E.APP_VERSION + ' · the log stays on this phone';
@@ -320,6 +338,7 @@
     try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today()); S.stale = false; S.swapping = false; }
     catch (e) { S.result = null; $('resultArea').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; $('logArea').innerHTML = ''; return; }
     ST.lastId = null; // a new workout on screen: the previous entry stays recorded, but Undo now belongs to the next one
+    ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type } }; S.offered = false;
     saveState();
     renderResult(); renderLog();
     const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -334,7 +353,8 @@
     if (!w.check.ok) { el.innerHTML = '<div class="err">This workout does not add up (' + w.check.sum + ' of ' + w.check.total + ' min, core ' + w.check.coreMinutes + ' of ' + w.check.minCore + ') and will not be shown. Change a selection and build again.</div>'; return; }
     const lt = E.lastTrained(ST.log, w.selections.focus, { before: w.date });
     const count = E.weeklyCount(ST.log, today());
-    const stale = S.stale ? '<div class="stale-note">Selections changed. Tap Build to refresh. The workout below is for the previous selections and cannot be logged.</div>' : '';
+    const stale = S.stale ? '<div class="stale-note">Selections changed. Tap Build to refresh. The workout below is for the previous selections and cannot be logged.</div>' :
+      (S.offered ? '<div class="stale-note">Built on ' + esc(E.longDate(w.date)) + ' and not logged. Log it below, or <button type="button" class="linkbtn" id="dismissBtn">dismiss it</button>.</div>' : '');
     const mainItems = '<ol>' + w.main.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>';
     el.innerHTML = stale + '<div class="result' + (S.stale ? ' stale' : '') + '">' +
       '<p class="title">' + esc(w.header.focus) + ' · ' + esc(w.header.type) + (w.header.typeChanged ? ' <span class="sub">(you chose ' + esc(w.header.chosenType) + ')</span>' : '') + ' · ' + w.header.total + ' min</p>' +
@@ -349,6 +369,7 @@
       '<p class="safety">' + esc(w.safety) + '</p>' +
       '<div class="meta"><div>Last trained ' + esc(w.header.focus) + ': <b>' + (lt ? esc(E.longDate(lt)) : 'no record yet') + '</b></div>' +
       '<div>This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b> workouts' + (ST.goal === null ? ' logged · no goal set yet' : '') + '</div></div></div>';
+    if ($('dismissBtn')) $('dismissBtn').onclick = () => { ST.pending = null; S.offered = false; S.result = null; saveState(); renderResult(); renderLog(); toast('Dismissed. Nothing was logged.'); };
   }
 
   /* ---------- story 3: log it, see the row, undo ---------- */
@@ -385,7 +406,7 @@
   }
   function record(status, swapped) {
     if (!S.result || S.stale || !S.result.check.ok) return; // never log a workout other than the one on screen, and never one that does not add up
-    const w = S.result, d = today();
+    const w = S.result, d = w.date || today(); // the day it was built: today, or the earlier day of an offered build; editable on the card
     const row = {
       id: newId(), date: d, week_start: E.mondayOf(d), time_selected_min: w.selections.time, equipment: w.selections.equipment,
       focus: swapped ? swapped.focus : w.selections.focus, type: swapped ? swapped.type : w.selections.type,
@@ -393,7 +414,7 @@
     };
     const errs = E.validateLogRow(row);
     if (errs.length) { toast('Not recorded: ' + errs[0]); return; }
-    ST.log.push(row); ST.lastId = row.id; S.swapping = false; saveState();
+    ST.log.push(row); ST.lastId = row.id; S.swapping = false; ST.pending = null; S.offered = false; saveState();
     renderGoal(); renderResult(); renderLog();
     const r = $('logArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -553,7 +574,7 @@
     if (navigator.serviceWorker.controller) offlineNote(); else navigator.serviceWorker.addEventListener('controllerchange', offlineNote, { once: true });
   }
 
-  renderGoal(); renderSelectors(); renderBuild(); renderLog(); renderBackup();
+  renderGoal(); renderSelectors(); renderBuild(); renderResult(); renderLog(); renderBackup(); // renderResult: an offered build is on screen from the start
 })();
 </script>
 </body>
