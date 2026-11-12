@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.1'; // C2: strength rounds 4 min / 90 s at every length; no pair holds two barbell lifts or two whole-body lifts (decision 2)
+  const APP_VERSION = '0.6.2'; // C1: pairs run barbell, then weights, then bodyweight; the heavier row leads each pair (decision 1)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -359,6 +359,15 @@
   function wholeBodyLift(r) { return r.loadClass !== 'bodyweight' && r.focus.length === 1 && r.focus[0] === 'total'; }
   function canPair(a, b) { return !(a.loadClass === 'barbell' && b.loadClass === 'barbell') && !(wholeBodyLift(a) && wholeBodyLift(b)); }
 
+  /* Order by load class (workout-rules.md §8, decision 1 of 2026-11-12): the pairs run barbell first, then weights, then bodyweight,
+     by the heavier row of each pair, and inside a pair the heavier row is A1. The rotation's order holds inside each class. */
+  const LOAD_RANK = { barbell: 0, weights: 1, bodyweight: 2 };
+  function loadRank(r) { return r.loadClass in LOAD_RANK ? LOAD_RANK[r.loadClass] : 1; }
+  function orderByLoad(pairs) {
+    pairs.forEach(pr => { if (loadRank(pr.a2) < loadRank(pr.a1)) { const t = pr.a1; pr.a1 = pr.a2; pr.a2 = t; } });
+    return pairs.map((pr, i) => ({ pr, i })).sort((x, y) => (loadRank(x.pr.a1) - loadRank(y.pr.a1)) || (x.i - y.i)).map(x => x.pr);
+  }
+
   /* Pairs from the ordered pool: A1 is the next unused row; A2 the next unused row of another pattern that may share a pair with it;
      failing another pattern, the next unused row that may, and the pair says so. A row with no allowed partner waits for a later pair. */
   function formPairs(ordered, P) {
@@ -390,7 +399,7 @@
     const items = [];
     const maxPairs = Math.floor(pool.length / 2);
     let roundsPerPair = [];
-    const pairs = maxPairs < 1 ? [] : formPairs(ordered, P);
+    const pairs = maxPairs < 1 ? [] : orderByLoad(formPairs(ordered, P));
     if (!pairs.length) {
       const row = ordered[0];
       if (!row) throw new Error('No exercise fits ' + selectionText(ctx.sel) + '.');
@@ -623,11 +632,15 @@
     if (w.main.kind === 'pairs') {
       const byPair = {};
       w.main.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (byPair[m[1]] = byPair[m[1]] || [])[+m[2] - 1] = findRow(library, i.name); });
-      Object.keys(byPair).forEach(L => {
+      let prevRank = -1;
+      Object.keys(byPair).sort().forEach(L => {
         const a = byPair[L][0], b = byPair[L][1];
         if (!a || !b) return;
         if (a.loadClass === 'barbell' && b.loadClass === 'barbell') v.push('pair ' + L + ' holds two barbell lifts');
         if (wholeBodyLift(a) && wholeBodyLift(b)) v.push('pair ' + L + ' holds two whole-body compound lifts');
+        if (loadRank(a) > loadRank(b)) v.push('pair ' + L + ' puts the lighter load class first');
+        if (loadRank(a) < prevRank) v.push('pair ' + L + ' (' + a.loadClass + ') comes after a lighter pair');
+        prevRank = loadRank(a);
       });
     }
     if (w.main.kind === 'pairs' && w.selections.type === 'strength' && !w.header.typeChanged) {
@@ -645,7 +658,7 @@
     blockMinutes, parseISO, isDate, addDays, mondayOf, dayIndex, todayIn, longDate,
     weeklyCount, lastTrained, focusCount,
     validateSelections, validateGoal, validateLogRow, serializeLog, parseLog,
-    allowedExercises, buildWorkout, workoutText, audit, wholeBodyLift, canPair,
+    allowedExercises, buildWorkout, workoutText, audit, wholeBodyLift, canPair, loadRank,
     equipLabel, focusLabel, typeLabel
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -101,6 +101,18 @@
     return { actual: pairs + ' pairs; ' + bb + ' two-barbell; ' + wb + ' two-whole-body; whole-body rows: ' + whole.join(', ') + '; canPair ' + cp.map(x => x ? 'yes' : 'no').join(', '),
       pass: pairs > 0 && bb === 0 && wb === 0 && whole.length === 6 && !cp[0] && cp[1] && !cp[2] };
   });
+  await check('U17', 'C1 order by load class: in every Full gym, Basic gym and Dumbbells strength and power build the pairs run barbell, then weights, then bodyweight, and inside a pair the heavier row is A1', 'pairs examined > 0; 0 out of order (the sample shows the classes in order)', () => {
+    let pairs = 0, bad = 0;
+    E.TIMES.forEach(t => ['full-gym', 'basic-gym', 'dumbbells-only'].forEach(e => ['upper', 'lower', 'total', 'core'].forEach(f => ['strength', 'power'].forEach(ty => {
+      const w = E.buildWorkout(lib, sel(t, e, f, ty), [], TODAY); if (w.main.kind !== 'pairs') return;
+      const by = {}; w.main.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (by[m[1]] = by[m[1]] || [])[+m[2] - 1] = E.findRow(lib, i.name); });
+      let prev = -1;
+      Object.keys(by).sort().forEach(L => { const a = by[L][0], b = by[L][1]; if (!a || !b) return; pairs++; if (E.loadRank(a) > E.loadRank(b) || E.loadRank(a) < prev) bad++; prev = E.loadRank(a); });
+    }))));
+    const w = E.buildWorkout(lib, sel(90, 'full-gym', 'lower', 'strength'), [], TODAY);
+    const seq = w.main.items.map(i => i.tag + ':' + E.findRow(lib, i.name).loadClass).join(' ');
+    return { actual: pairs + ' pairs; ' + bad + ' out of order; sample 90 · Full gym · Lower · Strength: ' + seq, pass: pairs > 0 && bad === 0 };
+  });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
     const a = offered(['treadmill']), b = offered(['treadmill', 'sled', 'stairclimber']);
