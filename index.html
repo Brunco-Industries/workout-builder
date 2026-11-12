@@ -111,6 +111,7 @@
 <div class="app">
   <div class="head"><h1>Workout builder</h1><button type="button" class="navbtn" id="youBtn" aria-pressed="false">You</button></div>
   <div id="updateBanner" class="banner update" hidden><span>A new version is ready.</span><button type="button" id="reloadBtn">Reload</button></div>
+  <div id="backupBanner" class="banner update" hidden><span id="backupBannerText"></span><button type="button" id="backupBannerBtn">Open You</button></div>
   <div id="storageBanner" class="banner" hidden></div>
   <div id="loadError" class="err" hidden></div>
 
@@ -171,7 +172,7 @@
 
   /* ---------- the record: localStorage, one key; nothing leaves the phone ---------- */
   const KEY = 'workout-builder:v1';
-  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [], setup: null, pending: null });
+  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [], setup: null, pending: null, lastBackup: null });
   /* A built workout that was not logged: its selections and date are kept so it can be offered on the next open. Never logged on its own. */
   function sanitizePending(d) {
     if (!d || typeof d !== 'object' || !d.sel || typeof d.sel !== 'object') return null;
@@ -214,6 +215,7 @@
     st.lastId = st.log.some(r => r.id === d.lastId) ? d.lastId : null;
     st.setup = sanitizeSetup(d.setup);
     st.pending = sanitizePending(d.pending);
+    st.lastBackup = (d.lastBackup && typeof d.lastBackup === 'object' && E.isDate(d.lastBackup.date) && Number.isInteger(d.lastBackup.count)) ? { date: d.lastBackup.date, count: d.lastBackup.count } : null;
     return st;
   }
   function saveState(keepImportUndo) {
@@ -520,11 +522,21 @@
   };
 
   /* ---------- log backup: export and import in the training-log.csv format; nothing is sent anywhere ---------- */
+  const entries = n => n + ' entr' + (n === 1 ? 'y' : 'ies');
   function renderBackup() {
-    const n = ST.log.length;
-    $('backupInfo').textContent = n + ' entr' + (n === 1 ? 'y' : 'ies') + ' on this phone. The log lives only here: export it once a week. A file exported from this app restores it. On iPhone, Safari and the home-screen app keep separate logs: use one of them, or move the log between them with Download and Import.';
+    const n = ST.log.length, lb = ST.lastBackup;
+    const last = lb ? 'Last download: ' + E.longDate(lb.date) + ' (' + entries(lb.count) + ').' : 'No download yet.';
+    $('backupInfo').textContent = entries(n) + ' on this phone. ' + last + ' The log lives only here: download it once a week. A file exported from this app restores it. On iPhone, Safari and the home-screen app keep separate logs: use one of them, or move the log between them with Download and Import.';
     $('csvText').value = E.serializeLog(ST.log);
+    /* The reminder (professor, 6): entries on the phone with no download yet, or new entries a week or more after the last one. Never more than a line; never on its own does anything. */
+    const newSince = lb ? n - lb.count : n;
+    const days = lb ? E.dayIndex(today()) - E.dayIndex(lb.date) : null;
+    const show = n > 0 && newSince > 0 && (lb === null ? n >= 3 : days >= 7);
+    $('backupBanner').hidden = !show;
+    if (show) $('backupBannerText').textContent = lb ? entries(newSince) + ' not backed up since your last download on ' + E.longDate(lb.date) + '.' : entries(n) + ' on this phone and no download yet.';
   }
+  $('backupBannerBtn').onclick = () => { if (!S.you) $('youBtn').click(); };
+  function markBackup() { ST.lastBackup = { date: today(), count: ST.log.length }; saveState(true); }
   /* Download and Share are separate controls (peer P-08): the share sheet used to pre-empt the download on every browser that could share files. */
   const csvFile = () => { const csv = E.serializeLog(ST.log), name = 'training-log-' + today() + '.csv'; $('csvText').value = csv; return { csv, name }; };
   function downloadLog() {
@@ -533,11 +545,12 @@
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     $('csvDetails').open = true;
+    markBackup();
     toast('Download started: ' + name + '. The CSV text is also shown below.');
   }
   async function shareLog() {
     const { csv, name } = csvFile();
-    try { await navigator.share({ files: [new File([csv], name, { type: 'text/csv' })], title: name }); toast('Shared ' + name); }
+    try { await navigator.share({ files: [new File([csv], name, { type: 'text/csv' })], title: name }); markBackup(); toast('Shared ' + name); }
     catch (e) { if (!(e && e.name === 'AbortError')) toast('Sharing did not work here. Use Download.'); }
   }
   $('downloadBtn').onclick = downloadLog;
@@ -546,7 +559,7 @@
     if (navigator.canShare && navigator.canShare({ files: [probe] })) { $('shareBtn').hidden = false; $('shareBtn').onclick = shareLog; }
   } catch (e) { /* no File or share support: Share stays hidden, Download always works */ }
   $('copyBtn').onclick = async () => {
-    try { await navigator.clipboard.writeText($('csvText').value); toast('CSV copied'); }
+    try { await navigator.clipboard.writeText($('csvText').value); markBackup(); toast('CSV copied'); }
     catch (e) { $('csvText').select(); toast('Select the text and copy it'); }
   };
   $('importBtn').onclick = () => { $('importFile').value = ''; $('importFile').click(); };

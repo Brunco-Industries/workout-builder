@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.5.5'; // A17: the four log statuses are explained under the log bar
+  const APP_VERSION = '0.5.6'; // A18: a backup reminder when entries sit on the phone without a download
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
