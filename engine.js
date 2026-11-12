@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.5.0'; // A12: a built workout that was not logged is kept and offered on the next open; end of phase A
+  const APP_VERSION = '0.5.1'; // A13: small buttons keep white text; the muted .small text class no longer bleeds into them
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
