@@ -81,6 +81,26 @@
     return { actual: bad + ' invalid rows; get-up: ' + (tgu ? tgu.text : 'absent') + '; carry: ' + (carry ? carry.text : 'absent') + '; mountain climbers cooldown ' + (mc && mc.cooldownOk ? 'yes' : 'no'),
       pass: bad === 0 && !!tgu && /8–12/.test(tgu.text) && !/20–30 s/.test(tgu.text) && !!carry && /about 40 m/.test(carry.text) && !!mc && !mc.cooldownOk };
   });
+  await check('U15', 'C2 rest and rounds: strength is 4-min rounds with 90 s rests at 15, 30, 45, 60 and 120 min; power keeps 3 min / 60 s under a 60-min main block and 4 min / 90 s from 60', 'strength 4/90 at every length; power 3/60 at 45, 4/90 at 90', () => {
+    const s = [15, 30, 45, 60, 120].map(t => { const w = E.buildWorkout(lib, sel(t, 'full-gym', 'lower', 'strength'), [], TODAY); return w.main.roundMinutes + '/' + (w.main.items.every(i => / rest 90 s$/.test(i.text)) ? '90' : 'not 90'); });
+    const p45 = E.buildWorkout(lib, sel(45, 'full-gym', 'lower', 'power'), [], TODAY), p90 = E.buildWorkout(lib, sel(90, 'full-gym', 'lower', 'power'), [], TODAY);
+    const p = [p45, p90].map(w => w.main.roundMinutes + '/' + (w.main.items.every(i => / rest (60|90) s$/.test(i.text)) ? i2(w) : 'mixed'));
+    function i2(w) { return (/ rest 60 s$/.test(w.main.items[0].text) ? '60' : '90'); }
+    return { actual: 'strength ' + s.join(' · ') + '; power ' + p.join(' · '), pass: s.every(x => x === '4/90') && p[0] === '3/60' && p[1] === '4/90' };
+  });
+  await check('U16', 'C2 pairing exclusions: no pair holds two barbell lifts or two whole-body compound lifts (every Full gym strength and power build, every time, every focus); canPair refuses the pairs the rule names', 'pairs examined > 0; 0 two-barbell; 0 two-whole-body; 6 whole-body rows; canPair: squat+deadlift no, squat+goblet yes, thruster+clean-and-press no', () => {
+    let pairs = 0, bb = 0, wb = 0;
+    E.TIMES.forEach(t => ['upper', 'lower', 'total', 'core'].forEach(f => ['strength', 'power'].forEach(ty => {
+      const w = E.buildWorkout(lib, sel(t, 'full-gym', f, ty), [], TODAY); if (w.main.kind !== 'pairs') return;
+      const by = {}; w.main.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (by[m[1]] = by[m[1]] || [])[+m[2] - 1] = E.findRow(lib, i.name); });
+      Object.keys(by).forEach(L => { const a = by[L][0], b = by[L][1]; if (!a || !b) return; pairs++; if (a.loadClass === 'barbell' && b.loadClass === 'barbell') bb++; if (E.wholeBodyLift(a) && E.wholeBodyLift(b)) wb++; });
+    })));
+    const whole = lib.filter(E.wholeBodyLift).map(r => r.name);
+    const R = n => E.findRow(lib, n);
+    const cp = [E.canPair(R('Barbell back squat'), R('Barbell deadlift')), E.canPair(R('Barbell back squat'), R('Dumbbell goblet squat')), E.canPair(R('Dumbbell thruster'), R('Dumbbell clean and press'))];
+    return { actual: pairs + ' pairs; ' + bb + ' two-barbell; ' + wb + ' two-whole-body; whole-body rows: ' + whole.join(', ') + '; canPair ' + cp.map(x => x ? 'yes' : 'no').join(', '),
+      pass: pairs > 0 && bb === 0 && wb === 0 && whole.length === 6 && !cp[0] && cp[1] && !cp[2] };
+  });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
     const a = offered(['treadmill']), b = offered(['treadmill', 'sled', 'stairclimber']);

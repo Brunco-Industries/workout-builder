@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.0'; // C0: strength is 8–12 reps for every row (Stephen, 2026-11-12); phase C begins
+  const APP_VERSION = '0.6.1'; // C2: strength rounds 4 min / 90 s at every length; no pair holds two barbell lifts or two whole-body lifts (decision 2)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -42,9 +42,9 @@
 
   /* ---------- TIMING: every figure here is an ASSUMPTION (workout-rules.md §8) ---------- */
   const TIMING = {
-    strength: { roundMinutes: 3, longRoundMinutes: 4, longMainFrom: 60, maxRoundsPerPair: 5,
+    strength: { roundMinutes: 4, restSeconds: 90, maxRoundsPerPair: 5, // 4-min rounds, 90 s rests at every length: decision 2 (2026-11-12); before, 3 min / 60 s under a 60-min main block
       reps: '8–12', hold: '20–30 s', effort: 'a weight you could lift 1–2 more times', effortBodyweight: 'the hardest variation you can do for 8–12 clean reps' }, // 8–12: Stephen, 2026-11-12 (workout-rules.md §5)
-    power: { roundMinutes: 3, longRoundMinutes: 4, longMainFrom: 60, maxRoundsPerPair: 5,
+    power: { roundMinutes: 3, restSeconds: 60, longRoundMinutes: 4, longRestSeconds: 90, longMainFrom: 60, maxRoundsPerPair: 5,
       reps: '3–5 fast', jumps: '3–5 jumps', hold: '20–30 s', effort: 'light to moderate; move fast, and stop the set when speed drops', effortBodyweight: 'move fast, and stop the set when speed drops' },
     endurance: { stationSeconds: 45, changeSeconds: 15, roundRestSeconds: 60, minStations: 3, maxStations: 8, minRounds: 2, maxRounds: 12,
       reps: '12–20', effort: 'a weight you could lift 5+ more times; steady pace, strict form', effortBodyweight: 'steady pace, strict form' },
@@ -353,36 +353,63 @@
   }
   const item = (tag, row, text, minutes) => ({ tag, name: row.name, pattern: row.pattern, note: row.notes, text, minutes });
 
+  /* Pairing exclusions (workout-rules.md §8, decision 2 of 2026-11-12): a pair never holds two barbell lifts, and never two
+     whole-body compound lifts. A whole-body compound lift is a loaded row filed under Total body alone (focus exactly "total"):
+     the thrusters, the snatches, the clean and press, the power clean. The definition is the team's, [PROPOSED] until Stephen confirms it. */
+  function wholeBodyLift(r) { return r.loadClass !== 'bodyweight' && r.focus.length === 1 && r.focus[0] === 'total'; }
+  function canPair(a, b) { return !(a.loadClass === 'barbell' && b.loadClass === 'barbell') && !(wholeBodyLift(a) && wholeBodyLift(b)); }
+
+  /* Pairs from the ordered pool: A1 is the next unused row; A2 the next unused row of another pattern that may share a pair with it;
+     failing another pattern, the next unused row that may, and the pair says so. A row with no allowed partner waits for a later pair. */
+  function formPairs(ordered, P) {
+    const used = ordered.map(() => false), pairs = [];
+    for (let i = 0; i < ordered.length && pairs.length < P; i++) {
+      if (used[i]) continue;
+      const a1 = ordered[i];
+      const find = pred => { for (let k = i + 1; k < ordered.length; k++) if (!used[k] && pred(ordered[k])) return k; return -1; };
+      let j = find(r => r.pattern !== a1.pattern && canPair(a1, r)), samePattern = false;
+      if (j < 0) { j = find(r => canPair(a1, r)); samePattern = j >= 0; }
+      if (j < 0) continue;
+      used[i] = used[j] = true;
+      pairs.push({ a1, a2: ordered[j], samePattern });
+    }
+    return pairs;
+  }
+
   /* ---------- main block: strength and power as paired rounds ---------- */
   function pairsBlock(ctx, pool, main, type) {
     const cfg = TIMING[type];
-    const roundLen = main >= cfg.longMainFrom ? cfg.longRoundMinutes : cfg.roundMinutes;
-    const rest = roundLen === cfg.roundMinutes ? '60 s' : '90 s';
+    const long = cfg.longMainFrom != null && main >= cfg.longMainFrom;
+    const roundLen = long ? cfg.longRoundMinutes : cfg.roundMinutes;
+    const rest = (long ? cfg.longRestSeconds : cfg.restSeconds) + ' s';
     const R = Math.floor(main / roundLen);
     let P = Math.ceil(R / cfg.maxRoundsPerPair);
     const base = pool.slice();
     pool = extendPool(ctx, pool.slice(), 2 * P, type);
-    const rot = makeRotation(orderedPool(base, pool, ctx.start), 0);
+    const ordered = orderedPool(base, pool, ctx.start);
     const items = [];
     const maxPairs = Math.floor(pool.length / 2);
     let roundsPerPair = [];
-    if (maxPairs < 1) {
-      const row = rot.next();
+    const pairs = maxPairs < 1 ? [] : formPairs(ordered, P);
+    if (!pairs.length) {
+      const row = ordered[0];
       if (!row) throw new Error('No exercise fits ' + selectionText(ctx.sel) + '.');
       items.push(item('1', row, prescribe(row, type, R, rest)));
       roundsPerPair = [R];
-      ctx.notes.push('Only one exercise fits this selection: straight sets instead of pairs.');
+      ctx.notes.push(maxPairs < 1 ? 'Only one exercise fits this selection: straight sets instead of pairs.'
+        : 'No two of the exercises that fit this selection may share a pair (two barbell lifts, or two whole-body lifts): straight sets instead of pairs.');
     } else {
-      if (P > maxPairs) { P = maxPairs; ctx.notes.push('Rounds per pair above ' + cfg.maxRoundsPerPair + ': only ' + pool.length + ' exercises fit this selection.'); }
-      const base = Math.floor(R / P), extra = R % P;
-      for (let p = 0; p < P; p++) {
-        const rounds = base + (p < extra ? 1 : 0), L = String.fromCharCode(65 + p);
-        const a1 = rot.next();
-        let a2 = rot.next(r => r.pattern !== a1.pattern);
-        if (!a2) { a2 = rot.next(); ctx.notes.push('Pair ' + L + ': both exercises are ' + a1.pattern + ' movements; no other pattern fits this selection.'); }
-        items.push(item(L + '1', a1, prescribe(a1, type, rounds, rest)), item(L + '2', a2, prescribe(a2, type, rounds, rest)));
-        roundsPerPair.push(rounds);
+      if (P > pairs.length) {
+        P = pairs.length;
+        ctx.notes.push('Rounds per pair above ' + cfg.maxRoundsPerPair + ': only ' + (maxPairs < P + 1 ? pool.length + ' exercises fit this selection.' : P + ' pair' + (P === 1 ? '' : 's') + ' can be formed under the pairing rules.'));
       }
+      const base = Math.floor(R / P), extra = R % P;
+      pairs.forEach((pr, p) => {
+        const rounds = base + (p < extra ? 1 : 0), L = String.fromCharCode(65 + p);
+        if (pr.samePattern) ctx.notes.push('Pair ' + L + ': both exercises are ' + pr.a1.pattern + ' movements; no other pattern fits this selection.');
+        items.push(item(L + '1', pr.a1, prescribe(pr.a1, type, rounds, rest)), item(L + '2', pr.a2, prescribe(pr.a2, type, rounds, rest)));
+        roundsPerPair.push(rounds);
+      });
     }
     const remainder = main - R * roundLen;
     const lo = Math.min.apply(null, roundsPerPair), hi = Math.max.apply(null, roundsPerPair);
@@ -593,9 +620,21 @@
     if (WEIGHT_RE.test(w.text)) v.push('a weight is stated');
     if (PUSH_THROUGH_RE.test(w.text)) v.push('"push through" language');
     if (w.text.indexOf(SAFETY_LINE) < 0) v.push('safety line missing');
+    if (w.main.kind === 'pairs') {
+      const byPair = {};
+      w.main.items.forEach(i => { const m = /^([A-Z])([12])$/.exec(i.tag); if (m) (byPair[m[1]] = byPair[m[1]] || [])[+m[2] - 1] = findRow(library, i.name); });
+      Object.keys(byPair).forEach(L => {
+        const a = byPair[L][0], b = byPair[L][1];
+        if (!a || !b) return;
+        if (a.loadClass === 'barbell' && b.loadClass === 'barbell') v.push('pair ' + L + ' holds two barbell lifts');
+        if (wholeBodyLift(a) && wholeBodyLift(b)) v.push('pair ' + L + ' holds two whole-body compound lifts');
+      });
+    }
     if (w.main.kind === 'pairs' && w.selections.type === 'strength' && !w.header.typeChanged) {
       if (!w.main.items.some(i => /^A1$/.test(i.tag)) || !w.main.items.some(i => /^A2$/.test(i.tag))) v.push('strength block has no A1/A2 pair');
+      if (w.main.roundMinutes !== TIMING.strength.roundMinutes) v.push('strength rounds are ' + w.main.roundMinutes + ' min, not ' + TIMING.strength.roundMinutes);
       w.main.items.forEach(i => { const row = findRow(library, i.name); if (row && row.types.includes('strength') && !/8–12|20–30 s|about 40 m/.test(i.text)) v.push('"' + i.name + '" is not dosed 8–12 reps, a hold or a distance'); });
+      w.main.items.forEach(i => { if (i.tag && !new RegExp('rest ' + TIMING.strength.restSeconds + ' s$').test(i.text)) v.push('"' + i.name + '" does not rest ' + TIMING.strength.restSeconds + ' s'); });
     }
     return v;
   }
@@ -606,7 +645,7 @@
     blockMinutes, parseISO, isDate, addDays, mondayOf, dayIndex, todayIn, longDate,
     weeklyCount, lastTrained, focusCount,
     validateSelections, validateGoal, validateLogRow, serializeLog, parseLog,
-    allowedExercises, buildWorkout, workoutText, audit,
+    allowedExercises, buildWorkout, workoutText, audit, wholeBodyLift, canPair,
     equipLabel, focusLabel, typeLabel
   };
 })(typeof window !== 'undefined' ? window : this);
