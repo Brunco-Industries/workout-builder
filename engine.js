@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.10'; // A10: the recorded card asks how the time went first, one tap
+  const APP_VERSION = '0.4.11'; // A11: Download and Share are separate controls; the share sheet no longer hides the download
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

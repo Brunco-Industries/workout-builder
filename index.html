@@ -137,7 +137,8 @@
     <h3>Log backup</h3>
     <p class="hint" id="backupInfo"></p>
     <div>
-      <button class="btn small" id="exportBtn" type="button">Export log (CSV)</button>
+      <button class="btn small" id="downloadBtn" type="button">Download log (CSV)</button>
+      <button class="btn small ghost" id="shareBtn" type="button" hidden>Share log</button>
       <button class="btn small ghost" id="importBtn" type="button">Import log (CSV)</button>
       <input type="file" id="importFile" accept=".csv,text/csv,text/plain" hidden>
     </div>
@@ -482,26 +483,29 @@
   /* ---------- log backup: export and import in the training-log.csv format; nothing is sent anywhere ---------- */
   function renderBackup() {
     const n = ST.log.length;
-    $('backupInfo').textContent = n + ' entr' + (n === 1 ? 'y' : 'ies') + ' on this phone. The log lives only here: export it once a week. A file exported from this app restores it. On iPhone, Safari and the home-screen app keep separate logs: use one of them, or move the log between them with Export and Import.';
+    $('backupInfo').textContent = n + ' entr' + (n === 1 ? 'y' : 'ies') + ' on this phone. The log lives only here: export it once a week. A file exported from this app restores it. On iPhone, Safari and the home-screen app keep separate logs: use one of them, or move the log between them with Download and Import.';
     $('csvText').value = E.serializeLog(ST.log);
   }
-  async function exportLog() {
-    const csv = E.serializeLog(ST.log), name = 'training-log-' + today() + '.csv';
-    $('csvText').value = csv;
-    try {
-      const file = new File([csv], name, { type: 'text/csv' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: name }); toast('Shared ' + name); return; }
-        catch (e) { if (e && e.name === 'AbortError') return; }
-      }
-    } catch (e) { /* no File or share support: fall through to the download */ }
+  /* Download and Share are separate controls (peer P-08): the share sheet used to pre-empt the download on every browser that could share files. */
+  const csvFile = () => { const csv = E.serializeLog(ST.log), name = 'training-log-' + today() + '.csv'; $('csvText').value = csv; return { csv, name }; };
+  function downloadLog() {
+    const { csv, name } = csvFile();
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     $('csvDetails').open = true;
     toast('Download started: ' + name + '. The CSV text is also shown below.');
   }
-  $('exportBtn').onclick = exportLog;
+  async function shareLog() {
+    const { csv, name } = csvFile();
+    try { await navigator.share({ files: [new File([csv], name, { type: 'text/csv' })], title: name }); toast('Shared ' + name); }
+    catch (e) { if (!(e && e.name === 'AbortError')) toast('Sharing did not work here. Use Download.'); }
+  }
+  $('downloadBtn').onclick = downloadLog;
+  try {
+    const probe = new File(['x'], 'probe.csv', { type: 'text/csv' });
+    if (navigator.canShare && navigator.canShare({ files: [probe] })) { $('shareBtn').hidden = false; $('shareBtn').onclick = shareLog; }
+  } catch (e) { /* no File or share support: Share stays hidden, Download always works */ }
   $('copyBtn').onclick = async () => {
     try { await navigator.clipboard.writeText($('csvText').value); toast('CSV copied'); }
     catch (e) { $('csvText').select(); toast('Select the text and copy it'); }
