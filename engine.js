@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.3'; // A3: time picker, a stepper with quick picks instead of 22 chips
+  const APP_VERSION = '0.4.4'; // A4: the last selections and the machine ticks per equipment are remembered on the phone
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

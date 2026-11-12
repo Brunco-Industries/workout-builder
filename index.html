@@ -154,7 +154,26 @@
 
   /* ---------- the record: localStorage, one key; nothing leaves the phone ---------- */
   const KEY = 'workout-builder:v1';
-  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [] });
+  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [], setup: null });
+  /* The remembered set-up: the last selections and the machine ticks per gym. Anything not in the allowed lists is dropped, never defaulted. */
+  function sanitizeSetup(d) {
+    if (!d || typeof d !== 'object') return null;
+    const s = { time: null, equipment: null, focus: null, type: null, machinesBy: {} };
+    if (E.TIMES.includes(d.time)) s.time = d.time;
+    if (E.EQUIPMENT.some(e => e.key === d.equipment)) s.equipment = d.equipment;
+    if (E.FOCUS.some(f => f.key === d.focus)) s.focus = d.focus;
+    if (E.TYPES.some(t => t.key === d.type)) s.type = d.type;
+    const mb = d.machinesBy && typeof d.machinesBy === 'object' ? d.machinesBy : {};
+    Object.keys(E.DEFAULT_MACHINES).forEach(k => { if (Array.isArray(mb[k])) s.machinesBy[k] = mb[k].filter(m => E.MACHINES.includes(m)); });
+    return s;
+  }
+  const rememberedMachines = k => (ST.setup && Array.isArray(ST.setup.machinesBy[k])) ? ST.setup.machinesBy[k].slice() : (E.DEFAULT_MACHINES[k] || []).slice();
+  function rememberSetup() {
+    const mb = Object.assign({}, (ST.setup && ST.setup.machinesBy) || {});
+    if (S.sel.equipment in E.DEFAULT_MACHINES) mb[S.sel.equipment] = S.sel.machines.slice();
+    ST.setup = { time: S.sel.time, equipment: S.sel.equipment, focus: S.sel.focus, type: S.sel.type, machinesBy: mb };
+    saveState(true);
+  }
   let storageOk = true;
   function loadState() {
     let raw = null;
@@ -167,6 +186,7 @@
     (Array.isArray(d.log) ? d.log : []).forEach(r => { if (r && E.validateLogRow(r).length === 0) st.log.push(r); else st.quarantine.push(r); });
     st.quarantine = st.quarantine.concat(Array.isArray(d.quarantine) ? d.quarantine : []);
     st.lastId = st.log.some(r => r.id === d.lastId) ? d.lastId : null;
+    st.setup = sanitizeSetup(d.setup);
     return st;
   }
   function saveState(keepImportUndo) {
@@ -186,6 +206,10 @@
 
   const ST = loadState();
   const S = { sel: { time: null, equipment: null, machines: [], focus: null, type: null }, result: null, stale: false, swapping: false, goalEditing: false, importUndo: null };
+  if (ST.setup) { // the last set-up comes back; the workout itself does not, so nothing stale can be logged
+    S.sel.time = ST.setup.time; S.sel.equipment = ST.setup.equipment; S.sel.focus = ST.setup.focus; S.sel.type = ST.setup.type;
+    S.sel.machines = S.sel.equipment ? rememberedMachines(S.sel.equipment) : [];
+  }
   const today = () => E.todayIn();
   $('footer').textContent = 'Workout builder ' + E.APP_VERSION + ' · the log stays on this phone';
   renderStorageBanner();
@@ -224,7 +248,7 @@
       b.setAttribute('aria-pressed', isOn(key) ? 'true' : 'false'); b.onclick = () => onTap(key); c.appendChild(b);
     });
   }
-  function changed() { if (S.result) S.stale = true; S.swapping = false; renderSelectors(); renderBuild(); renderResult(); renderLog(); }
+  function changed() { if (S.result) S.stale = true; S.swapping = false; rememberSetup(); renderSelectors(); renderBuild(); renderResult(); renderLog(); }
   /* Time: a stepper in 5-minute steps with quick picks. Only values in E.TIMES can be produced; validation is unchanged. */
   function renderTime() {
     const c = $('timeChips'); c.innerHTML = '';
@@ -242,7 +266,7 @@
   }
   function renderSelectors() {
     renderTime();
-    chipRow('equipChips', E.EQUIPMENT.map(e => [e.key, e.label]), k => S.sel.equipment === k, k => { S.sel.equipment = k; S.sel.machines = (E.DEFAULT_MACHINES[k] || []).slice(); changed(); });
+    chipRow('equipChips', E.EQUIPMENT.map(e => [e.key, e.label]), k => S.sel.equipment === k, k => { S.sel.equipment = k; S.sel.machines = rememberedMachines(k); changed(); });
     const gym = S.sel.equipment in E.DEFAULT_MACHINES;
     $('machineRow').hidden = !gym;
     if (gym) chipRow('machineChips', E.MACHINES.map(m => [m, E.MACHINE_LABELS[m]]), k => S.sel.machines.includes(k), k => {
