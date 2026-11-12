@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.5'; // A5: the backup and the version line move to a You screen
+  const APP_VERSION = '0.4.6'; // A6: the iPhone note, Safari and the home-screen app keep separate logs
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

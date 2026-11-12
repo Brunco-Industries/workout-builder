@@ -424,7 +424,7 @@
   /* ---------- log backup: export and import in the training-log.csv format; nothing is sent anywhere ---------- */
   function renderBackup() {
     const n = ST.log.length;
-    $('backupInfo').textContent = n + ' entr' + (n === 1 ? 'y' : 'ies') + ' on this phone. The log lives only here: export it once a week. A file in the training-log.csv format restores it.';
+    $('backupInfo').textContent = n + ' entr' + (n === 1 ? 'y' : 'ies') + ' on this phone. The log lives only here: export it once a week. A file exported from this app restores it. On iPhone, Safari and the home-screen app keep separate logs: use one of them, or move the log between them with Export and Import.';
     $('csvText').value = E.serializeLog(ST.log);
   }
   async function exportLog() {
