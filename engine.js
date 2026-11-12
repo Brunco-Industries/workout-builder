@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.2'; // C1: pairs run barbell, then weights, then bodyweight; the heavier row leads each pair (decision 1)
+  const APP_VERSION = '0.6.3'; // C3: one ramp-up minute inside the main block before each barbell lift (decision 3)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -391,41 +391,53 @@
     const long = cfg.longMainFrom != null && main >= cfg.longMainFrom;
     const roundLen = long ? cfg.longRoundMinutes : cfg.roundMinutes;
     const rest = (long ? cfg.longRestSeconds : cfg.restSeconds) + ' s';
-    const R = Math.floor(main / roundLen);
-    let P = Math.ceil(R / cfg.maxRoundsPerPair);
+    let R = Math.floor(main / roundLen);
+    const P0 = Math.ceil(R / cfg.maxRoundsPerPair);
     const base = pool.slice();
-    pool = extendPool(ctx, pool.slice(), 2 * P, type);
+    pool = extendPool(ctx, pool.slice(), 2 * P0, type);
     const ordered = orderedPool(base, pool, ctx.start);
     const items = [];
     const maxPairs = Math.floor(pool.length / 2);
     let roundsPerPair = [];
-    const pairs = maxPairs < 1 ? [] : orderByLoad(formPairs(ordered, P));
-    if (!pairs.length) {
-      const row = ordered[0];
-      if (!row) throw new Error('No exercise fits ' + selectionText(ctx.sel) + '.');
-      items.push(item('1', row, prescribe(row, type, R, rest)));
+    let pairs = maxPairs < 1 ? [] : orderByLoad(formPairs(ordered, P0));
+    const single = pairs.length ? null : ordered[0];
+    if (!pairs.length && !single) throw new Error('No exercise fits ' + selectionText(ctx.sel) + '.');
+    /* Ramp-up (workout-rules.md §8, decision 3 of 2026-11-12): one minute inside the block before each barbell lift's first set, taken
+       from the block's minutes. Fewer minutes can mean fewer rounds and so one pair fewer, dropped from the lighter end; the count settles. */
+    const rowsOf = () => single ? [single] : pairs.reduce((a, pr) => a.concat(pr.a1, pr.a2), []);
+    const rampOf = () => rowsOf().filter(r => r.loadClass === 'barbell').length;
+    let ramp = rampOf();
+    for (;;) {
+      R = Math.floor((main - ramp) / roundLen);
+      const need = Math.max(1, Math.ceil(R / cfg.maxRoundsPerPair));
+      if (!single && need < pairs.length) { pairs = pairs.slice(0, need); ramp = rampOf(); continue; }
+      break;
+    }
+    const rampText = row => row.loadClass === 'barbell' ? '1 min ramp-up, then ' : '';
+    if (single) {
+      items.push(item('1', single, rampText(single) + prescribe(single, type, R, rest)));
       roundsPerPair = [R];
       ctx.notes.push(maxPairs < 1 ? 'Only one exercise fits this selection: straight sets instead of pairs.'
         : 'No two of the exercises that fit this selection may share a pair (two barbell lifts, or two whole-body lifts): straight sets instead of pairs.');
     } else {
-      if (P > pairs.length) {
-        P = pairs.length;
-        ctx.notes.push('Rounds per pair above ' + cfg.maxRoundsPerPair + ': only ' + (maxPairs < P + 1 ? pool.length + ' exercises fit this selection.' : P + ' pair' + (P === 1 ? '' : 's') + ' can be formed under the pairing rules.'));
-      }
+      const need = Math.ceil(R / cfg.maxRoundsPerPair), P = pairs.length;
+      if (need > P) ctx.notes.push('Rounds per pair above ' + cfg.maxRoundsPerPair + ': only ' + (maxPairs < need ? pool.length + ' exercises fit this selection.' : P + ' pair' + (P === 1 ? '' : 's') + ' can be formed under the pairing rules.'));
       const base = Math.floor(R / P), extra = R % P;
       pairs.forEach((pr, p) => {
         const rounds = base + (p < extra ? 1 : 0), L = String.fromCharCode(65 + p);
         if (pr.samePattern) ctx.notes.push('Pair ' + L + ': both exercises are ' + pr.a1.pattern + ' movements; no other pattern fits this selection.');
-        items.push(item(L + '1', pr.a1, prescribe(pr.a1, type, rounds, rest)), item(L + '2', pr.a2, prescribe(pr.a2, type, rounds, rest)));
+        items.push(item(L + '1', pr.a1, rampText(pr.a1) + prescribe(pr.a1, type, rounds, rest)), item(L + '2', pr.a2, rampText(pr.a2) + prescribe(pr.a2, type, rounds, rest)));
         roundsPerPair.push(rounds);
       });
     }
-    const remainder = main - R * roundLen;
+    const minutesUsed = R * roundLen + ramp;
+    const remainder = main - minutesUsed;
     const lo = Math.min.apply(null, roundsPerPair), hi = Math.max.apply(null, roundsPerPair);
     const effort = effortFor(ctx.sel, type);
     const intro = typeLabel(type) + ': ' + (type === 'strength' ? cfg.reps + ' reps, ' + effort : cfg.reps + ' reps, ' + effort) +
-      '. A1, rest, A2, rest; ' + (lo === hi ? lo : lo + '–' + hi) + ' rounds per pair, about ' + roundLen + ' min a round.';
-    return { kind: 'pairs', roundMinutes: roundLen, rounds: R, pairs: items.length / 2, items, remainder, minutesUsed: R * roundLen,
+      '. A1, rest, A2, rest; ' + (lo === hi ? lo : lo + '–' + hi) + ' rounds per pair, about ' + roundLen + ' min a round.' +
+      (ramp ? ' Each barbell lift starts with a 1-minute ramp-up.' : '');
+    return { kind: 'pairs', roundMinutes: roundLen, rounds: R, pairs: items.length / 2, items, remainder, minutesUsed, rampUpMinutes: ramp,
       intro, tail: remainder ? 'Set-up and change-over · ' + remainder + ' min' : '', used: items.map(i => i.name) };
   }
 
@@ -642,6 +654,11 @@
         if (loadRank(a) < prevRank) v.push('pair ' + L + ' (' + a.loadClass + ') comes after a lighter pair');
         prevRank = loadRank(a);
       });
+      const barbell = w.main.items.filter(i => i.tag && (findRow(library, i.name) || {}).loadClass === 'barbell');
+      barbell.forEach(i => { if (!/^1 min ramp-up, then /.test(i.text)) v.push('"' + i.name + '" has no ramp-up minute'); });
+      w.main.items.forEach(i => { if (i.tag && /ramp-up/.test(i.text) && (findRow(library, i.name) || {}).loadClass !== 'barbell') v.push('"' + i.name + '" has a ramp-up minute but is not a barbell lift'); });
+      if ((w.main.rampUpMinutes || 0) !== barbell.length) v.push('ramp-up minutes (' + (w.main.rampUpMinutes || 0) + ') do not match the ' + barbell.length + ' barbell lifts');
+      if (w.main.rounds * w.main.roundMinutes + (w.main.rampUpMinutes || 0) !== w.main.minutesUsed) v.push('rounds, round length and ramp-up do not make the minutes used');
     }
     if (w.main.kind === 'pairs' && w.selections.type === 'strength' && !w.header.typeChanged) {
       if (!w.main.items.some(i => /^A1$/.test(i.tag)) || !w.main.items.some(i => /^A2$/.test(i.tag))) v.push('strength block has no A1/A2 pair');

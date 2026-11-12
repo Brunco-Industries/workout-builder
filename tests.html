@@ -113,6 +113,18 @@
     const seq = w.main.items.map(i => i.tag + ':' + E.findRow(lib, i.name).loadClass).join(' ');
     return { actual: pairs + ' pairs; ' + bad + ' out of order; sample 90 · Full gym · Lower · Strength: ' + seq, pass: pairs > 0 && bad === 0 };
   });
+  await check('U18', 'C3 ramp-up: in every Full gym strength and power build each barbell lift carries "1 min ramp-up, then", no other row does, and rounds × round length + ramp-up minutes = the minutes used, inside the main block', 'barbell lifts > 0; 0 without a ramp-up; 0 non-barbell with one; 0 sums off', () => {
+    let bb = 0, missing = 0, extra = 0, off = 0, builds = 0;
+    E.TIMES.forEach(t => ['upper', 'lower', 'total', 'core'].forEach(f => ['strength', 'power'].forEach(ty => {
+      const w = E.buildWorkout(lib, sel(t, 'full-gym', f, ty), [], TODAY); if (w.main.kind !== 'pairs') return; builds++;
+      let k = 0;
+      w.main.items.forEach(i => { if (!i.tag) return; const isBB = E.findRow(lib, i.name).loadClass === 'barbell', has = /^1 min ramp-up, then /.test(i.text); if (isBB) { bb++; k++; if (!has) missing++; } else if (has) extra++; });
+      if (w.main.rounds * w.main.roundMinutes + k !== w.main.minutesUsed || w.main.minutesUsed + w.main.remainder !== w.blocks.main || w.main.rampUpMinutes !== k) off++;
+    })));
+    const w = E.buildWorkout(lib, sel(60, 'full-gym', 'lower', 'strength'), [], TODAY);
+    return { actual: builds + ' builds; ' + bb + ' barbell lifts; ' + missing + ' without a ramp-up; ' + extra + ' non-barbell with one; ' + off + ' sums off; 60 · Full gym · Lower · Strength: ' + w.main.rounds + ' rounds × ' + w.main.roundMinutes + ' + ' + w.main.rampUpMinutes + ' ramp-up = ' + w.main.minutesUsed + ' of ' + w.blocks.main + ', ' + w.main.items[0].tag + ' ' + w.main.items[0].name + ' · ' + w.main.items[0].text,
+      pass: bb > 0 && missing === 0 && extra === 0 && off === 0 };
+  });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
     const a = offered(['treadmill']), b = offered(['treadmill', 'sled', 'stairclimber']);
