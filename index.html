@@ -19,6 +19,10 @@
   html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
   .app{max-width:430px;margin:0 auto;padding:12px 14px calc(24px + env(safe-area-inset-bottom))}
   h1{font-size:1.25rem;margin:6px 0 8px}
+  .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .navbtn{font:inherit;font-size:.9rem;font-weight:700;border:1px solid var(--accent);background:var(--card);color:var(--accent);border-radius:999px;padding:6px 14px;min-height:36px}
+  .navbtn[aria-pressed=true]{background:var(--accent);color:#fff}
+  #youView .backup{margin-top:4px}
   .row{margin:10px 0}
   .lbl{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
   .chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -99,11 +103,12 @@
 </head>
 <body>
 <div class="app">
-  <h1>Workout builder</h1>
+  <div class="head"><h1>Workout builder</h1><button type="button" class="navbtn" id="youBtn" aria-pressed="false">You</button></div>
   <div id="updateBanner" class="banner update" hidden><span>A new version is ready.</span><button type="button" id="reloadBtn">Reload</button></div>
   <div id="storageBanner" class="banner" hidden></div>
   <div id="loadError" class="err" hidden></div>
 
+  <div id="mainView">
   <div id="goalArea"></div>
 
   <p class="needs" id="needsLine">To build a workout the app needs: time, equipment, focus and type.</p>
@@ -120,7 +125,9 @@
     <div id="resultArea"></div>
     <div id="logArea"></div>
   </div>
+  </div>
 
+  <div id="youView" hidden>
   <section class="card backup" id="backup">
     <h3>Log backup</h3>
     <p class="hint" id="backupInfo"></p>
@@ -138,6 +145,7 @@
   </section>
 
   <p class="footer" id="footer"></p>
+  </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="engine.js"></script>
@@ -212,6 +220,12 @@
   }
   const today = () => E.todayIn();
   $('footer').textContent = 'Workout builder ' + E.APP_VERSION + ' · the log stays on this phone';
+  /* The You screen: the log backup and the version line live here, off the main screen. Nothing on it changes a selection or the log on its own. */
+  S.you = false;
+  $('youBtn').onclick = () => {
+    S.you = !S.you; $('mainView').hidden = S.you; $('youView').hidden = !S.you;
+    $('youBtn').textContent = S.you ? 'Back' : 'You'; $('youBtn').setAttribute('aria-pressed', S.you ? 'true' : 'false'); window.scrollTo(0, 0);
+  };
   renderStorageBanner();
 
   let toastTimer;

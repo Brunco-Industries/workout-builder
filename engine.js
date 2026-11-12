@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.4.4'; // A4: the last selections and the machine ticks per equipment are remembered on the phone
+  const APP_VERSION = '0.4.5'; // A5: the backup and the version line move to a You screen
   const SPEC_VERSION = '1.5';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
