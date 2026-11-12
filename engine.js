@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.5.1'; // A13: small buttons keep white text; the muted .small text class no longer bleeds into them
+  const APP_VERSION = '0.5.2'; // A14: the set-up stays hidden while the goal card is open, so saving the goal moves nothing under the finger
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

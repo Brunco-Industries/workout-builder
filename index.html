@@ -116,7 +116,7 @@
 
   <div id="mainView">
   <div id="goalArea"></div>
-
+  <div id="planArea">
   <p class="needs" id="needsLine">To build a workout the app needs: time, equipment, focus and type.</p>
   <div class="row"><span class="lbl">Time (minutes, includes warm-up and cool-down)</span><div class="timepick" id="timeChips"></div></div>
   <div class="row"><span class="lbl">Equipment</span><div class="chips" id="equipChips"></div><p class="hint" style="margin:6px 0 0">Bodyweight moves are included with every option.</p></div>
@@ -132,6 +132,7 @@
     <div id="logArea"></div>
   </div>
   <div id="offlineLog"><button type="button" class="btn ghost small" id="offlineBtn">Did a workout without the app? Log it</button><div id="offlineCard"></div></div>
+  </div>
   </div>
 
   <div id="youView" hidden>
@@ -260,12 +261,13 @@
   function renderGoal() {
     const count = E.weeklyCount(ST.log, today());
     const el = $('goalArea');
+    $('planArea').hidden = ST.goal === null || S.goalEditing; // while the goal card is open nothing sits under it, so saving moves nothing under the finger
     if (ST.goal === null || S.goalEditing) {
       el.innerHTML = '<div class="card"><h3>' + (ST.goal === null ? 'Set your weekly goal' : 'Change your weekly goal') + '</h3>' +
         '<p class="hint">Workouts per week, 1 to 7. You can change it any time.</p>' +
         '<div class="field"><input id="goalInput" type="number" inputmode="numeric" min="1" max="7" step="1" value="' + (ST.goal === null ? '' : ST.goal) + '" aria-label="Weekly goal"> <button class="btn small" id="goalSave" type="button">Save goal</button>' + (ST.goal !== null ? ' <button class="btn small ghost" id="goalCancel" type="button">Cancel</button>' : '') + '</div>' +
         '<p class="ferr" id="goalErr" hidden></p>' +
-        '<p class="hint" style="margin-top:8px">This week so far: <b>' + count + '</b> logged (' + E.longDate(today()) + ').</p></div>';
+        '<p class="hint" style="margin-top:8px">This week so far: <b>' + count + '</b> logged (' + E.longDate(today()) + '). ' + (ST.goal === null ? 'Then choose time, equipment, focus and type.' : 'The set-up comes back when you save or cancel.') + '</p></div>';
       $('goalSave').onclick = () => {
         const v = $('goalInput').value.trim(), err = E.validateGoal(v);
         if (err) { const e = $('goalErr'); e.hidden = false; e.textContent = err + ' You entered "' + v + '".'; return; }
