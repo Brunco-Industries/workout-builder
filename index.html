@@ -307,7 +307,7 @@
     }
     list.forEach(([key], i) => { const b = c.children[i]; b.setAttribute('aria-pressed', isOn(key) ? 'true' : 'false'); b.onclick = () => onTap(key); });
   }
-  function changed() { if (S.result) S.stale = true; S.swapping = false; rememberSetup(); renderSelectors(); renderBuild(); renderResult(); renderLog(); }
+  function changed() { if (S.result) S.stale = true; S.swapping = false; S.offset = 0; rememberSetup(); renderSelectors(); renderBuild(); renderResult(); renderLog(); }
   /* Time: a stepper in 5-minute steps with quick picks. Only values in E.TIMES can be produced; validation is unchanged. */
   function renderTime() {
     const c = $('timeChips');
@@ -360,6 +360,7 @@
     h.textContent = 'Warm-up ' + bm.warmup + ' min · main block ' + bm.main + ' min · cool-down ' + bm.cooldown + ' min, ending with at least ' + bm.minCore + ' min of core.';
   }
   $('buildBtn').onclick = () => {
+    S.offset = 0; // a fresh build starts the rotation where the day and the log put it; "build another" moves it on from there
     try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today()); S.stale = false; S.swapping = false; }
     catch (e) { S.result = null; $('resultArea').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; $('logArea').innerHTML = ''; return; }
     ST.lastId = null; // a new workout on screen: the previous entry stays recorded, but Undo now belongs to the next one
@@ -395,9 +396,23 @@
       '<section class="block"><h4>Cool-down <span class="min">' + b.cooldown + ' min</span></h4>' + list(w.cooldown.stretch) +
         '<div class="core"><h5>Core <span class="min">' + w.cooldown.core.minutes + ' min</span></h5>' + list(w.cooldown.core.items) + '<p class="small" style="margin-top:4px">' + esc(w.cooldown.core.tail) + '</p></div></section>' +
       '<p class="safety">' + esc(w.safety) + '</p>' +
+      (S.stale ? '' : '<p><button type="button" class="btn ghost small" id="anotherBtn">Build another</button> <span class="small">Different exercises for the same choices: the rotation moves on by the ' + w.main.items.length + ' used here, and only the workout on screen can be logged.</span></p>') +
       '<div class="meta"><div>Last trained ' + esc(w.header.focus) + ': <b>' + (lt ? esc(E.longDate(lt)) : 'no record yet') + '</b></div>' +
       '<div>This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b> workouts' + (ST.goal === null ? ' logged · no goal set yet' : '') + '</div></div></div>';
     if ($('dismissBtn')) $('dismissBtn').onclick = () => { ST.pending = null; S.offered = false; S.result = null; saveState(); renderResult(); renderLog(); toast('Dismissed. Nothing was logged.'); };
+    if ($('anotherBtn')) $('anotherBtn').onclick = () => { // decision 19: the rotation moves on by the exercises the build on screen used
+      if (S.stale || !S.result) return;
+      const used = S.result.main.items.length;
+      const offset = (S.offset || 0) + used;
+      let next;
+      try { next = E.buildWorkout(LIB, S.sel, ST.log, today(), { startOffset: offset }); }
+      catch (e) { toast('Could not build another: ' + e.message); return; }
+      S.offset = offset; S.result = next; S.stale = false; S.swapping = false; ST.lastId = null;
+      ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type }, result: S.result }; S.offered = false;
+      saveState(); renderResult(); renderLog();
+      const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      toast('Built another: the rotation moved on by ' + used + '.');
+    };
     el.querySelectorAll('.swapbtn').forEach(b => b.onclick = () => {
       if (S.stale || !S.result) return;
       const r = E.swapExercise(LIB, S.result, b.getAttribute('data-name'));

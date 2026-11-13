@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.6'; // C6: a swap control on every main exercise (decision 5)
+  const APP_VERSION = '0.6.7'; // C11: a build-another control moves the rotation on by the exercises used (decision 19)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -607,14 +607,16 @@
     return m;
   }
 
-  function buildWorkout(library, sel, log, today) {
+  /* opts.startOffset (decision 19, "build another", 2026-11-12): moves the rotation start on by that many rows, the number the build on screen used. */
+  function buildWorkout(library, sel, log, today, opts) {
     const errs = validateSelections(sel);
     if (errs.length) throw new RangeError(errs.join(' '));
     if (!isDate(today)) throw new RangeError('today must be a YYYY-MM-DD date.');
+    const startOffset = opts && Number.isInteger(opts.startOffset) && opts.startOffset >= 0 ? opts.startOffset : 0;
     const b = blockMinutes(sel.time);
     const ae = allowedExercises(library, sel);
     const type = ae.deliveredType;
-    const ctx = { library, sel, notes: ae.notes.slice(), start: dayIndex(today) + focusCount(log, sel.focus), usedMain: new Set(), mainMinutes: b.main };
+    const ctx = { library, sel, notes: ae.notes.slice(), start: dayIndex(today) + focusCount(log, sel.focus) + startOffset, usedMain: new Set(), mainMinutes: b.main };
     const main = sel.focus === 'cardio' ? composeMain([Object.assign(cardioBlock(ctx, ae.pool, b.main, type), { type })], b.main)
       : fillMain(ctx, ae.pool, b.main, type, sel.focus === 'core' ? b.minCore : 0);
     const used = new Set(main.used);
@@ -624,7 +626,7 @@
     stretch.forEach(i => used.add(i.name));
     const warmup = warmupBlock(ctx, b.warmup, type, used);
     const w = {
-      version: APP_VERSION, specVersion: SPEC_VERSION, date: today,
+      version: APP_VERSION, specVersion: SPEC_VERSION, date: today, startOffset,
       selections: { time: sel.time, equipment: sel.equipment, machines: (sel.machines || []).slice(), focus: sel.focus, type: sel.type },
       header: {
         focus: focusLabel(sel.focus), type: main.types.map(typeLabel).join(', then '), mixed: main.types.length > 1, chosenType: typeLabel(sel.type), typeChanged: type !== sel.type,
