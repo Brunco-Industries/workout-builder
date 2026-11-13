@@ -60,6 +60,7 @@
   .field label{margin:0;min-width:92px}
   .field input{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);width:100%;background:var(--card);color:var(--ink);min-height:40px}
   .field input[type=number]{max-width:130px}
+  .field select{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);min-height:40px;max-width:100%;flex:1 1 auto}
   .ferr{color:var(--warn);font-size:.86rem;margin:4px 0 0}
   .ok{background:var(--ok-bg);border-radius:8px;padding:6px 10px;font-size:.9rem}
   /* result */
@@ -142,6 +143,7 @@
   </section>
 
   <button class="btn" id="buildBtn" type="button" disabled>Choose time, equipment, focus and type</button>
+  <button class="btn ghost" id="templateBtn" type="button" hidden>Start from last time</button>
   <p class="hint" id="splitHint"></p>
 
   <div id="session">
@@ -281,6 +283,7 @@
     try {
       S.sel = { time: ST.pending.sel.time, equipment: ST.pending.sel.equipment, machines: ST.pending.sel.machines.slice(), focus: ST.pending.sel.focus, type: ST.pending.sel.type };
       S.result = (ST.pending.result && ST.pending.result.version === E.APP_VERSION) ? ST.pending.result : E.buildWorkout(LIB, S.sel, ST.log, ST.pending.date, { sessions: ST.sessions }); S.stale = false; S.offered = true;
+      S.template = S.result.template ? { names: S.result.template.kept.slice(), date: S.result.template.date, rowId: S.result.template.rowId, type: S.result.template.type } : null;
     } catch (e) { ST.pending = null; S.result = null; }
   }
   const today = () => E.todayIn();
@@ -402,28 +405,36 @@
   function renderBuild() {
     renderCheckIn();
     const m = missing(), b = $('buildBtn'), h = $('splitHint');
+    // Story 6: the last session for this focus with detail rows can be the template; rotation stays the default (decision 21)
+    const tpl = S.sel.focus ? E.lastSessionTemplate(ST.log, ST.sessions, S.sel.focus) : null;
+    $('templateBtn').hidden = !tpl || m.length > 0;
+    if (tpl) $('templateBtn').textContent = 'Start from last time: ' + E.longDate(tpl.date) + ', ' + tpl.exercises.length + ' exercise' + (tpl.exercises.length === 1 ? '' : 's');
     if (m.length) { b.disabled = true; b.textContent = 'Choose ' + joinAnd(m); $('needsLine').textContent = 'Still needed: ' + joinAnd(m) + '.'; h.textContent = ''; return; }
     const bm = E.blockMinutes(S.sel.time);
     b.disabled = false; b.textContent = 'Build the ' + S.sel.time + '-minute workout';
     $('needsLine').textContent = 'All four chosen.';
     h.textContent = 'Warm-up ' + bm.warmup + ' min · main block ' + bm.main + ' min · cool-down ' + bm.cooldown + ' min, ending with at least ' + bm.minCore + ' min of core.';
   }
-  $('buildBtn').onclick = () => {
+  /* Build by rotation, or from a template (story 6): the last session for the focus, then his swaps, adds and drops, through the same checks every time. */
+  function buildNow(template) {
     S.offset = 0; // a fresh build starts the rotation where the day and the log put it; "build another" moves it on from there
     let decision;
     try { decision = E.checkInDecision(S.sel, S.checkIn); } catch (e) { toast('Check-in: ' + e.message); return; }
     if (decision.action === 'rest') { // §9: no workout is built; he decides, and nothing is logged
-      S.result = null; S.stale = false; S.offered = false; ST.pending = null; saveState(); renderRestOffer(decision); $('logArea').innerHTML = '';
+      S.result = null; S.template = null; S.stale = false; S.offered = false; ST.pending = null; saveState(); renderRestOffer(decision); $('logArea').innerHTML = '';
       const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
     }
-    try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today(), { checkIn: S.checkIn, sessions: ST.sessions }); S.stale = false; S.swapping = false; }
+    try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today(), { checkIn: S.checkIn, sessions: ST.sessions, template: template || undefined }); S.stale = false; S.swapping = false; }
     catch (e) { S.result = null; $('resultArea').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; $('logArea').innerHTML = ''; return; }
+    S.template = S.result.template ? { names: S.result.template.kept.slice(), date: S.result.template.date, rowId: S.result.template.rowId, type: S.result.template.type } : null;
     ST.lastId = null; // a new workout on screen: the previous entry stays recorded, but Undo now belongs to the next one
     ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type }, result: S.result }; S.offered = false;
     saveState();
     renderResult(); renderLog();
     const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  }
+  $('buildBtn').onclick = () => buildNow(null);
+  $('templateBtn').onclick = () => { const tpl = S.sel.focus ? E.lastSessionTemplate(ST.log, ST.sessions, S.sel.focus) : null; if (tpl) buildNow({ names: tpl.exercises, date: tpl.date, rowId: tpl.rowId, type: tpl.type }); };
 
   const list = items => '<ul>' + items.map(i => '<li>' + esc(i.name) + ' <span>' + esc(i.text) + '</span></li>').join('') + '</ul>';
   function renderResult() {
@@ -441,20 +452,27 @@
     const swapBtn = i => S.stale ? '' : ' <button type="button" class="linkbtn swapbtn" data-name="' + esc(i.name) + '" aria-label="Swap ' + esc(i.name) + '">swap</button>';
     // "Last time" (§10): what he recorded the last time the exercise came up, before this build's date; shown, never turned into a target
     const lastLine = i => { const lt = E.lastTime(ST.sessions, i.name, { before: w.date }); return lt ? '<small>Last time, ' + esc(E.longDate(lt.date)) + ': ' + esc(lt.text) + '</small>' : ''; };
+    const dropBtn = i => (S.stale || !w.template) ? '' : ' <button type="button" class="linkbtn dropbtn" data-name="' + esc(i.name) + '" aria-label="Drop ' + esc(i.name) + '">drop</button>';
     const segHtml = (w.main.segments || [w.main]).map(s => '<p class="note">' + esc(s.intro) + '</p><ol>' +
-      s.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + swapBtn(i) + lastLine(i) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>' +
+      s.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + swapBtn(i) + dropBtn(i) + lastLine(i) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>' +
       (s.tail ? '<p class="small">' + esc(s.tail) + '</p>' : '')).join('');
+    // Story 6: in a template build he can add any exercise that fits the focus and type and is not already in the workout; the build re-checks everything
+    let addHtml = '';
+    if (!S.stale && w.template) {
+      const c = E.templateCandidates(LIB, w.selections, w);
+      addHtml = c.length ? '<div class="field"><select id="addSel" aria-label="Exercise to add">' + c.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('') + '</select><button type="button" class="btn small ghost" id="addBtn">Add</button></div>' : '<p class="small">Nothing else fits these choices to add.</p>';
+    }
     el.innerHTML = stale + '<div class="result' + (S.stale ? ' stale' : '') + '">' +
       '<p class="title">' + esc(w.header.focus) + ' · ' + esc(w.header.type) + (w.header.typeChanged ? ' <span class="sub">(you chose ' + esc(w.header.chosenType) + ')</span>' : '') + ' · ' + w.header.total + ' min</p>' +
       '<p class="sub">' + esc(w.header.equipment) + (w.header.showsMachines ? (w.header.machines.length ? ' · machines: ' + esc(w.header.machines.map(m => (E.MACHINE_LABELS[m] || m).toLowerCase()).join(', ')) : ' · no machines ticked') : '') + '</p>' +
       w.notes.map(n => '<div class="subst">' + esc(n) + '</div>').join('') +
       '<section class="block"><h4>Warm-up <span class="min">' + b.warmup + ' min</span></h4>' + list(w.warmup) + '</section>' +
-      '<section class="block"><h4>Main block <span class="min">' + b.main + ' min</span></h4>' + segHtml + '</section>' +
+      '<section class="block"><h4>Main block <span class="min">' + b.main + ' min</span></h4>' + segHtml + addHtml + '</section>' +
       '<section class="block"><h4>Cool-down <span class="min">' + b.cooldown + ' min</span></h4>' + list(w.cooldown.stretch) +
         '<div class="core"><h5>Core <span class="min">' + w.cooldown.core.minutes + ' min</span></h5>' + list(w.cooldown.core.items) + '<p class="small" style="margin-top:4px">' + esc(w.cooldown.core.tail) + '</p></div></section>' +
       '<p class="safety">' + esc(w.safety) + '</p>' +
       (S.stale ? '' : '<p><button type="button" class="btn" id="startBtn">' + (ST.pending && ST.pending.perform ? 'Resume the workout (step ' + (ST.pending.perform.i + 1) + ')' : 'Start the workout') + '</button><span class="small">One exercise at a time, with the rests and intervals timed. What you enter is kept with the entry; nothing is assumed.</span></p>') +
-      (S.stale ? '' : '<p><button type="button" class="btn ghost small" id="anotherBtn">Build another</button> <span class="small">Different exercises for the same choices: the rotation moves on by the ' + w.main.items.length + ' used here, and only the workout on screen can be logged.</span></p>') +
+      (S.stale || w.template ? '' : '<p><button type="button" class="btn ghost small" id="anotherBtn">Build another</button> <span class="small">Different exercises for the same choices: the rotation moves on by the ' + w.main.items.length + ' used here, and only the workout on screen can be logged.</span></p>') +
       '<div class="meta"><div>Last trained ' + esc(w.header.focus) + ': <b>' + (lt ? esc(E.longDate(lt)) : 'no record yet') + '</b></div>' +
       '<div>This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b> workouts' + (ST.goal === null ? ' logged · no goal set yet' : '') + '</div></div></div>';
     if ($('dismissBtn')) $('dismissBtn').onclick = () => { ST.pending = null; S.offered = false; S.result = null; saveState(); renderResult(); renderLog(); toast('Dismissed. Nothing was logged.'); };
@@ -476,9 +494,23 @@
       if (S.stale || !S.result) return;
       const r = E.swapExercise(LIB, S.result, b.getAttribute('data-name'));
       if (!r) { toast('No other exercise of that pattern and load fits here.'); return; }
+      const sw = r.swaps[r.swaps.length - 1];
+      if (S.template) S.template.names = S.template.names.map(n => n === sw.from ? sw.to : n); // the template list follows the swap
       S.result = r; if (ST.pending) ST.pending.result = r; saveState(); renderResult();
-      toast('Swapped in ' + r.swaps[r.swaps.length - 1].to + '.');
+      toast('Swapped in ' + sw.to + '.');
     });
+    el.querySelectorAll('.dropbtn').forEach(b => b.onclick = () => {
+      if (S.stale || !S.result || !S.template) return;
+      const name = b.getAttribute('data-name');
+      buildNow(Object.assign({}, S.template, { names: S.template.names.filter(n => n !== name) }));
+      toast('Dropped ' + name + '.');
+    });
+    if ($('addBtn')) $('addBtn').onclick = () => {
+      if (S.stale || !S.result || !S.template) return;
+      const name = $('addSel').value;
+      buildNow(Object.assign({}, S.template, { names: S.template.names.concat([name]) }));
+      toast('Added ' + name + '.');
+    };
   }
 
   /* ---------- story 4, PERFORM: one step at a time; the timers run the rests and intervals; what he enters is his ---------- */
@@ -642,7 +674,7 @@
     ST.log.push(row);
     E.sessionRowsFromWorkout(w, row, S.performed || null).forEach(s => ST.sessions.push(s)); // RECORD: the exercises as built, with what he did if the workout was performed
     S.performed = null; ST.lastId = row.id; S.swapping = false; ST.pending = null; S.offered = false; saveState();
-    renderGoal(); renderResult(); renderLog();
+    renderGoal(); renderBuild(); renderResult(); renderLog(); // renderBuild: the "Start from last time" offer follows the record
     const r = $('logArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   const detailLine = r => {
@@ -694,7 +726,7 @@
       if (i >= 0) ST.log.splice(i, 1);
       ST.sessions = ST.sessions.filter(s => s.row_id !== row.id); // its detail rows go with it
       ST.lastId = null; saveState();
-      renderGoal(); renderResult(); renderLog(); toast('Entry removed. Nothing is recorded for it.');
+      renderGoal(); renderBuild(); renderResult(); renderLog(); toast('Entry removed. Nothing is recorded for it.');
     };
   }
 
@@ -793,7 +825,7 @@
     $('importSessCancel').onclick = () => { area.innerHTML = ''; };
     $('importSessGo').onclick = () => {
       ST.sessions = relinkSessions(parsed.rows, ST.log);
-      saveState(); renderResult(); renderLog(); renderSessInfo();
+      saveState(); renderBuild(); renderResult(); renderLog(); renderSessInfo();
       area.innerHTML = '<div class="ok">Imported ' + ST.sessions.length + ' exercise row' + (ST.sessions.length === 1 ? '' : 's') + ' from "' + esc(f.name) + '".</div>';
       toast('Imported the session record');
     };
@@ -848,12 +880,12 @@
       ST.sessions = relinkSessions(ST.sessions, ST.log); // the ids are new: detail rows re-attach to the entries of their date, in order
       ST.lastId = null;
       saveState(true);
-      renderGoal(); renderResult(); renderLog();
+      renderGoal(); renderBuild(); renderResult(); renderLog();
       area.innerHTML = '<div class="ok">Imported ' + ST.log.length + ' entr' + (ST.log.length === 1 ? 'y' : 'ies') + ' from "' + esc(f.name) + '". <button class="btn small ghost" id="importUndoBtn" type="button">Undo import</button></div>';
       $('importUndoBtn').onclick = () => {
         if (!S.importUndo) { toast('The import can no longer be undone: the log changed since.'); area.innerHTML = ''; return; }
         ST.log = S.importUndo; ST.sessions = relinkSessions(ST.sessions, ST.log); S.importUndo = null; ST.lastId = null; saveState();
-        renderGoal(); renderResult(); renderLog(); area.innerHTML = ''; toast('Import undone');
+        renderGoal(); renderBuild(); renderResult(); renderLog(); area.innerHTML = ''; toast('Import undone');
       };
       toast('Imported ' + ST.log.length + ' entries');
     };

@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.7.1'; // D1 PERFORM: the workout as steps with the §8 timers; the screen runs them one at a time
+  const APP_VERSION = '0.7.2'; // D5 TEMPLATE: start from the last session for the focus; swap, add or drop; the same checks
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -603,7 +603,8 @@
     const rest = (long ? cfg.longRestSeconds : cfg.restSeconds) + ' s';
     let R = Math.floor(main / roundLen);
     if (R < minR || !pool.length) return bail();
-    const P0 = Math.ceil(R / cfg.maxRoundsPerPair);
+    /* Pairs wanted: the fewest the cap allows; in a template build (story 6) as many as the rows and the rounds allow, at least 2 rounds each, so every exercise he kept or added is used. */
+    const P0 = ctx.template ? Math.max(Math.ceil(R / cfg.maxRoundsPerPair), Math.min(Math.floor(pool.length / 2), Math.floor(R / MIN_PAIR_ROUNDS))) : Math.ceil(R / cfg.maxRoundsPerPair);
     const base = pool.slice();
     pool = extendPool(ctx, pool.slice(), 2 * P0, type);
     const ordered = orderedPool(base, pool, ctx.start);
@@ -620,7 +621,7 @@
     let ramp = rampOf();
     for (;;) {
       R = Math.floor((main - ramp) / roundLen);
-      const need = Math.max(1, Math.ceil(R / cfg.maxRoundsPerPair));
+      const need = ctx.template ? Math.max(1, Math.min(pairs.length, Math.floor(R / MIN_PAIR_ROUNDS))) : Math.max(1, Math.ceil(R / cfg.maxRoundsPerPair)); // a template keeps every pair the rounds allow
       if (!single && need < pairs.length) { pairs = pairs.slice(0, need); ramp = rampOf(); continue; }
       break;
     }
@@ -819,9 +820,33 @@
     const b = blockMinutes(sel.time);
     const ae = allowedExercises(library, sel);
     const type = ae.deliveredType;
-    const ctx = { library, sel, notes: ae.notes.slice(), start: rotationStart(log, opts && opts.sessions, sel.focus, today) + startOffset, usedMain: new Set(), mainMinutes: b.main };
-    const main = sel.focus === 'cardio' ? composeMain([Object.assign(cardioBlock(ctx, ae.pool, b.main, type), { type })], b.main)
-      : fillMain(ctx, ae.pool, b.main, type, sel.focus === 'core' ? b.minCore : 0);
+    /* A template (story 6): its exercises, in order, as the first pool; the rotation is off; what the equipment or the type refuses is left out and named. */
+    const tpl = opts && opts.template && Array.isArray(opts.template.names) ? opts.template : null;
+    let firstPool = ae.pool, tplInfo = null, tplKept = [];
+    const tplNotes = [];
+    if (tpl) {
+      const kept = tplKept, left = [];
+      tpl.names.forEach(n => {
+        const r = findRow(library, n);
+        if (!r) { left.push(n + ' (no longer in the library)'); return; }
+        if (!rowAllowed(r, sel.equipment, sel.machines)) { left.push(n + ' (not allowed under ' + equipLabel(sel.equipment) + ')'); return; }
+        if (!r.types.includes(type)) { left.push(n + ' (not a ' + type + ' exercise)'); return; }
+        if ((r.pattern === 'cardio') !== (sel.focus === 'cardio')) { left.push(n + (sel.focus === 'cardio' ? ' (not a cardio modality)' : ' (a cardio row)')); return; }
+        if (!kept.some(k => k.name === r.name)) kept.push(r);
+      });
+      if (!kept.length) throw new RangeError('Nothing from that session fits these choices' + (left.length ? ': ' + left.join(', ') : '') + '. Change the equipment or type, or build by rotation.');
+      firstPool = kept;
+      tplInfo = { rowId: tpl.rowId || null, date: tpl.date || null, type: tpl.type || type, names: tpl.names.slice(), kept: kept.map(r => r.name), left };
+      tplNotes.push('Template: your ' + focusLabel(sel.focus) + ' · ' + typeLabel(tplInfo.type) + ' session' + (tpl.date ? ' of ' + longDate(tpl.date) : '') + ' (' + kept.length + ' exercise' + (kept.length === 1 ? '' : 's') + '); the rotation is off. Swap, add or drop below.' + (left.length ? ' Left out: ' + left.join(', ') + '.' : ''));
+    }
+    const ctx = { library, sel, notes: ae.notes.slice().concat(tplNotes), start: tpl ? 0 : rotationStart(log, opts && opts.sessions, sel.focus, today) + startOffset, usedMain: new Set(), mainMinutes: b.main, template: !!tpl };
+    const main = sel.focus === 'cardio' ? composeMain([Object.assign(cardioBlock(ctx, firstPool, b.main, type), { type })], b.main)
+      : fillMain(ctx, firstPool, b.main, type, sel.focus === 'core' ? b.minCore : 0);
+    if (tpl && sel.focus !== 'cardio') {
+      const unused = tplKept.filter(r => !ctx.usedMain.has(r.name)).map(r => r.name);
+      if (unused.length) ctx.notes.push('Not used: ' + unused.join(', ') + ' (pairs take an even count, and the time allows ' + Math.floor(b.main / (TIMING[type] || TIMING.strength).roundMinutes) + ' rounds; drop one or add another).');
+      tplInfo.unused = unused;
+    }
     /* The check-in (§9): applied after the fill, so the minutes a reduction frees stay free, as easy movement at the end of the block. */
     let checkIn = null;
     if (opts && opts.checkIn !== undefined) {
@@ -850,7 +875,7 @@
     stretch.forEach(i => used.add(i.name));
     const warmup = warmupBlock(ctx, b.warmup, type, used);
     const w = {
-      version: APP_VERSION, specVersion: SPEC_VERSION, date: today, startOffset, rotationStart: ctx.start,
+      version: APP_VERSION, specVersion: SPEC_VERSION, date: today, startOffset, rotationStart: tpl ? null : ctx.start, template: tplInfo, // a template build records no rotation start
       selections: { time: sel.time, equipment: sel.equipment, machines: (sel.machines || []).slice(), focus: sel.focus, type: sel.type },
       header: {
         focus: focusLabel(sel.focus), type: main.types.map(typeLabel).join(', then '), mixed: main.types.length > 1, chosenType: typeLabel(sel.type), typeChanged: type !== sel.type,
@@ -928,6 +953,29 @@
     w.swaps = (w.swaps || []).concat([{ from: old, to: next.name }]);
     w.text = workoutText(w);
     return w;
+  }
+
+  /* ---------- TEMPLATE (stories.md story 6, workout-rules.md §10): start from the last session for the focus ----------
+     The last logged workout of the focus that has detail rows gives its exercises in order; a template build keeps that order with the
+     rotation off, leaves out what the equipment or the type refuses and says so, and goes through the same blocks, pairing and core checks. */
+  function lastSessionTemplate(log, sessions, focus) {
+    let best = null;
+    (log || []).forEach((r, idx) => {
+      if (r.focus !== focus || r.status === 'skipped') return;
+      const rows = (sessions || []).filter(s => s.row_id === r.id).sort((a, b) => Number(a.order) - Number(b.order));
+      if (!rows.length) return;
+      if (!best || r.date > best.row.date || (r.date === best.row.date && idx > best.idx)) best = { row: r, rows, idx };
+    });
+    if (!best) return null;
+    return { rowId: best.row.id, date: best.row.date, type: best.row.type, equipment: best.row.equipment, exercises: best.rows.map(s => s.exercise), rows: best.rows };
+  }
+  /* The rows he may add to a template build: allowed for the focus and the block's type, not already in the workout. */
+  function templateCandidates(library, sel, w) {
+    const used = new Set([].concat(w.warmup, w.main.items, w.cooldown.stretch, w.cooldown.core.items).map(i => i.name).concat(w.template ? w.template.names : [])); // nor what the template already lists, used or not
+    const type = (w.main.segments && w.main.segments[0] && w.main.segments[0].type) || sel.type;
+    let base = sel.focus === 'cardio' ? poolFor(library, sel, 'cardio', type) : poolFor(library, sel, sel.focus, type);
+    if (sel.focus === 'total') base = base.concat(upperLowerRows(library, sel, type).filter(r => !base.some(b => b.name === r.name)));
+    return base.filter(r => !used.has(r.name)).map(r => r.name);
   }
 
   /* ---------- PERFORM (stories.md story 4): the workout as steps, one at a time, with the timers of §8 ----------
@@ -1065,7 +1113,7 @@
     allowedExercises, buildWorkout, workoutText, audit, swapExercise, wholeBodyLift, canPair, loadRank,
     ENERGY, AREAS, SORENESS, FOCUS_AREAS, validateCheckIn, checkInDecision,
     SESSION_FIELDS, FEELS, UNITS, validateSessionRow, serializeSessions, parseSessions, sessionRowsFromWorkout, performedText, feelLabel, hasDetail, lastTime, bestPerExercise, bestText, rotationStart,
-    performSteps,
+    performSteps, lastSessionTemplate, templateCandidates,
     equipLabel, focusLabel, typeLabel
   };
 })(typeof window !== 'undefined' ? window : this);
