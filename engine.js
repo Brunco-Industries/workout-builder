@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.7.3'; // D3 REVIEW: a History screen; every entry with its detail, previous and next, corrections, bests per exercise
+  const APP_VERSION = '0.7.4'; // D3 fix: the detail table scrolls sideways inside its card
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

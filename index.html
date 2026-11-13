@@ -781,7 +781,7 @@
     if (!det.length) b += '<p class="hint">No detail recorded for this entry.</p>';
     else {
       b += '<p class="hint">What was built and what you did. A blank stays blank; correct any cell. Loads are yours and are never turned into a target.</p>' +
-        '<table class="dtl"><thead><tr><th>#</th><th>Exercise</th><th>Built</th><th>Sets</th><th>Reps</th><th>Time s</th><th>Load</th><th>Unit</th><th>Feel</th><th>Skip</th></tr></thead><tbody>' +
+        '<div class="dtlwrap"><table class="dtl"><thead><tr><th>#</th><th>Exercise</th><th>Built</th><th>Sets</th><th>Reps</th><th>Time s</th><th>Load</th><th>Unit</th><th>Feel</th><th>Skip</th></tr></thead><tbody>' +
         det.map((s, k) => '<tr data-k="' + k + '"><td>' + s.order + '</td><td>' + esc(s.exercise) + '</td><td>' + esc(s.prescribed) + '</td>' +
           '<td><input type="number" inputmode="numeric" min="0" data-f="done_sets" value="' + esc(v0(s.done_sets)) + '"></td>' +
           '<td><input type="number" inputmode="numeric" min="0" data-f="done_reps" value="' + esc(v0(s.done_reps)) + '"></td>' +
