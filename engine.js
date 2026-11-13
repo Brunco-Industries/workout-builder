@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.8'; // C7: the optional check-in, energy and soreness (§9, decision 11)
+  const APP_VERSION = '0.7.0'; // D2 RECORD: the session record (validation, CSV, last time, bests) and the rotation offset it enables (decision 5)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -210,6 +210,122 @@
     return best;
   }
   const focusCount = (log, focus) => (log || []).filter(r => r.focus === focus && r.status !== 'skipped').length;
+
+  /* ---------- the session record (workout-rules.md §10, source-note.md): one row per main-block exercise of a logged workout ----------
+     What he did is his; a blank is "not recorded", never zero and never the prescription. rotation_start keeps where the build's rotation
+     began, so the next build for the focus can start where this one left off (decision 5). */
+  const SESSION_FIELDS = ['date', 'row_id', 'order', 'exercise', 'prescribed', 'done_sets', 'done_reps', 'done_time', 'load', 'unit', 'feel', 'skipped', 'energy', 'soreness', 'rotation_start'];
+  const FEELS = [{ key: 'easy', label: 'Easy' }, { key: 'right', label: 'Right' }, { key: 'too-hard', label: 'Too hard' }];
+  const UNITS = ['kg', 'lb'];
+  const LB_PER_KG = 2.20462; // a unit conversion for comparing bests only; loads are shown in the unit he recorded
+  const blank = v => v === '' || v === null || v === undefined;
+  const isWhole = v => /^\d+$/.test(String(v));
+  function validateSessionRow(r, line) {
+    const errs = [], at = line ? 'Line ' + line + ': ' : '';
+    r = r || {};
+    if (!isDate(r.date)) errs.push(at + 'date must be a real YYYY-MM-DD date.');
+    if (blank(r.row_id)) errs.push(at + 'row_id must name the training-log row.');
+    if (!isWhole(r.order) || Number(r.order) < 1) errs.push(at + 'order must be a whole number from 1.');
+    if (blank(r.exercise)) errs.push(at + 'exercise must be named.');
+    ['done_sets', 'done_reps', 'done_time'].forEach(f => { if (!blank(r[f]) && !isWhole(r[f])) errs.push(at + f + ' must be blank or a whole number.'); });
+    if (!blank(r.load) && !/^\d+(\.\d+)?$/.test(String(r.load))) errs.push(at + 'load must be blank or a number.');
+    if (!blank(r.load) && !UNITS.includes(r.unit)) errs.push(at + 'unit must be kg or lb when a load is given.');
+    if (blank(r.load) && !blank(r.unit) && !UNITS.includes(r.unit)) errs.push(at + 'unit must be kg, lb or blank.');
+    if (!blank(r.feel) && !FEELS.some(f => f.key === r.feel)) errs.push(at + 'feel must be blank, easy, right or too-hard.');
+    if (r.skipped !== 'yes' && r.skipped !== 'no') errs.push(at + 'skipped must be yes or no.');
+    if (!blank(r.energy) && !(isWhole(r.energy) && Number(r.energy) >= 1 && Number(r.energy) <= 5)) errs.push(at + 'energy must be blank or 1 to 5.');
+    if (!blank(r.soreness) && String(r.soreness).split(';').some(t => !/^(upper|lower|core):(none|moderate|severe)$/.test(t.trim()))) errs.push(at + 'soreness must be area:level pairs separated by ";" (upper, lower, core; none, moderate, severe).');
+    if (!blank(r.rotation_start) && !/^-?\d+$/.test(String(r.rotation_start))) errs.push(at + 'rotation_start must be blank or a whole number.');
+    return errs;
+  }
+  function serializeSessions(rows) {
+    return [SESSION_FIELDS.join(',')].concat((rows || []).map(r => SESSION_FIELDS.map(f => csvField(r[f])).join(','))).join('\n') + '\n';
+  }
+  function parseSessions(text) {
+    const rows = parseCSV(text);
+    if (!rows.length) return { rows: [], errors: ['The file is empty.'] };
+    if (rows[0].join(',') !== SESSION_FIELDS.join(',')) return { rows: [], errors: ['The header must be exactly: ' + SESSION_FIELDS.join(',')] };
+    const out = [], errors = [];
+    rows.slice(1).forEach((r, i) => {
+      const line = i + 2;
+      if (r.length !== SESSION_FIELDS.length) { errors.push('Line ' + line + ': expected ' + SESSION_FIELDS.length + ' fields, found ' + r.length + '.'); return; }
+      const row = {};
+      SESSION_FIELDS.forEach((f, j) => { row[f] = r[j]; });
+      ['order', 'done_sets', 'done_reps', 'done_time', 'energy', 'rotation_start'].forEach(f => { if (/^-?\d+$/.test(row[f])) row[f] = Number(row[f]); });
+      if (/^\d+(\.\d+)?$/.test(row.load)) row.load = Number(row.load);
+      const e = validateSessionRow(row, line);
+      if (e.length) errors.push.apply(errors, e); else out.push(row);
+    });
+    return { rows: out, errors };
+  }
+  /* The rows a logged workout writes: every main exercise in order, with what he did if PERFORM captured it, and the check-in answers. */
+  function sessionRowsFromWorkout(w, logRow, performed) {
+    const c = w.checkIn && w.checkIn.answers;
+    const energy = c && !unanswered(c.energy) ? c.energy : '';
+    const soreness = c && c.soreness ? AREAS.map(a => c.soreness[a.key] ? a.key + ':' + c.soreness[a.key] : '').filter(Boolean).join(';') : '';
+    return w.main.items.map((it, i) => {
+      const p = (performed && performed[it.name]) || {};
+      return { date: logRow.date, row_id: logRow.id, order: i + 1, exercise: it.name, prescribed: it.text,
+        done_sets: blank(p.sets) ? '' : Number(p.sets), done_reps: blank(p.reps) ? '' : Number(p.reps), done_time: blank(p.time) ? '' : Number(p.time),
+        load: blank(p.load) ? '' : Number(p.load), unit: blank(p.load) ? '' : (p.unit || ''), feel: p.feel || '', skipped: p.skipped ? 'yes' : 'no',
+        energy, soreness, rotation_start: Number.isInteger(w.rotationStart) ? w.rotationStart : '' };
+    });
+  }
+  const feelLabel = k => (FEELS.find(f => f.key === k) || {}).label || k;
+  /* What he did, in his words and units: "3 × 10 at 20 kg · Right". Only recorded fields appear. */
+  function performedText(r) {
+    if (r.skipped === 'yes') return 'skipped';
+    const sets = blank(r.done_sets) ? null : Number(r.done_sets);
+    let s = '';
+    if (!blank(r.done_reps)) s = (sets !== null ? sets + ' × ' : '') + r.done_reps + ' reps';
+    else if (!blank(r.done_time)) s = (sets !== null ? sets + ' × ' : '') + r.done_time + ' s';
+    else if (sets !== null) s = sets + ' set' + (sets === 1 ? '' : 's');
+    if (!blank(r.load)) s += (s ? ' at ' : '') + r.load + ' ' + r.unit;
+    if (!blank(r.feel)) s += (s ? ' · ' : '') + feelLabel(r.feel);
+    return s;
+  }
+  const hasDetail = r => r.skipped === 'yes' || !blank(r.done_sets) || !blank(r.done_reps) || !blank(r.done_time) || !blank(r.load) || !blank(r.feel);
+  /* "Last time": the latest recorded row for the exercise before a date, never an estimate. Null when nothing was recorded. */
+  function lastTime(sessions, exercise, opts) {
+    const before = opts && opts.before;
+    let best = null;
+    (sessions || []).forEach(r => {
+      if (r.exercise !== exercise || !hasDetail(r)) return;
+      if (before && r.date >= before) return;
+      if (!best || r.date > best.date || (r.date === best.date && Number(r.order) > Number(best.order))) best = r;
+    });
+    return best ? { date: best.date, text: performedText(best), row: best } : null;
+  }
+  /* His best per exercise, from recorded numbers only: the heaviest load (compared in kg, shown in his unit), else the most reps, else the longest time; ties go to the latest date. */
+  function bestPerExercise(sessions) {
+    const by = {}, rank = { load: 2, reps: 1, time: 0 };
+    (sessions || []).forEach(r => {
+      if (r.skipped === 'yes') return;
+      const kind = !blank(r.load) ? 'load' : !blank(r.done_reps) ? 'reps' : !blank(r.done_time) ? 'time' : null;
+      if (!kind) return;
+      const value = Number(kind === 'load' ? r.load : kind === 'reps' ? r.done_reps : r.done_time);
+      const cmp = kind === 'load' ? (r.unit === 'lb' ? value / LB_PER_KG : value) : value;
+      const cur = by[r.exercise];
+      if (!cur || rank[kind] > rank[cur.kind] || (rank[kind] === rank[cur.kind] && (cmp > cur.cmp || (cmp === cur.cmp && r.date > cur.date)))) {
+        by[r.exercise] = { exercise: r.exercise, kind, value, cmp, unit: kind === 'load' ? r.unit : kind === 'reps' ? 'reps' : 's',
+          reps: kind === 'load' && !blank(r.done_reps) ? Number(r.done_reps) : null, sets: blank(r.done_sets) ? null : Number(r.done_sets), date: r.date };
+      }
+    });
+    return Object.keys(by).sort().map(k => { const b = by[k]; delete b.cmp; return b; });
+  }
+  const bestText = b => (b.kind === 'load' ? b.value + ' ' + b.unit + (b.reps !== null ? ' × ' + b.reps + ' reps' : '') : b.value + ' ' + b.unit) + (b.sets !== null ? ' (' + b.sets + ' set' + (b.sets === 1 ? '' : 's') + ')' : '');
+  /* Decision 5 (rotation offset): the next build for a focus starts where the last logged one left off, read from the session record;
+     with no record for that focus, by the day and the count of logged workouts, as before. */
+  function rotationStart(log, sessions, focus, today) {
+    let last = null;
+    (log || []).forEach(r => { if (r.focus === focus && r.status !== 'skipped' && (!last || r.date >= last.date)) last = r; });
+    if (last) {
+      const rows = (sessions || []).filter(s => s.row_id === last.id);
+      const rs = rows.find(s => !blank(s.rotation_start));
+      if (rs) return Number(rs.rotation_start) + rows.length;
+    }
+    return dayIndex(today) + focusCount(log, focus);
+  }
 
   /* ---------- validation: refuse, never round or default ---------- */
   function validateSelections(sel) {
@@ -703,7 +819,7 @@
     const b = blockMinutes(sel.time);
     const ae = allowedExercises(library, sel);
     const type = ae.deliveredType;
-    const ctx = { library, sel, notes: ae.notes.slice(), start: dayIndex(today) + focusCount(log, sel.focus) + startOffset, usedMain: new Set(), mainMinutes: b.main };
+    const ctx = { library, sel, notes: ae.notes.slice(), start: rotationStart(log, opts && opts.sessions, sel.focus, today) + startOffset, usedMain: new Set(), mainMinutes: b.main };
     const main = sel.focus === 'cardio' ? composeMain([Object.assign(cardioBlock(ctx, ae.pool, b.main, type), { type })], b.main)
       : fillMain(ctx, ae.pool, b.main, type, sel.focus === 'core' ? b.minCore : 0);
     /* The check-in (§9): applied after the fill, so the minutes a reduction frees stay free, as easy movement at the end of the block. */
@@ -734,7 +850,7 @@
     stretch.forEach(i => used.add(i.name));
     const warmup = warmupBlock(ctx, b.warmup, type, used);
     const w = {
-      version: APP_VERSION, specVersion: SPEC_VERSION, date: today, startOffset,
+      version: APP_VERSION, specVersion: SPEC_VERSION, date: today, startOffset, rotationStart: ctx.start,
       selections: { time: sel.time, equipment: sel.equipment, machines: (sel.machines || []).slice(), focus: sel.focus, type: sel.type },
       header: {
         focus: focusLabel(sel.focus), type: main.types.map(typeLabel).join(', then '), mixed: main.types.length > 1, chosenType: typeLabel(sel.type), typeChanged: type !== sel.type,
@@ -886,6 +1002,7 @@
     validateSelections, validateGoal, validateLogRow, serializeLog, parseLog,
     allowedExercises, buildWorkout, workoutText, audit, swapExercise, wholeBodyLift, canPair, loadRank,
     ENERGY, AREAS, SORENESS, FOCUS_AREAS, validateCheckIn, checkInDecision,
+    SESSION_FIELDS, FEELS, UNITS, validateSessionRow, serializeSessions, parseSessions, sessionRowsFromWorkout, performedText, feelLabel, hasDetail, lastTime, bestPerExercise, bestText, rotationStart,
     equipLabel, focusLabel, typeLabel
   };
 })(typeof window !== 'undefined' ? window : this);

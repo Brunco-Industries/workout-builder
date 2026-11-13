@@ -155,6 +155,13 @@
       <input type="file" id="importFile" accept=".csv,text/csv,text/plain" hidden>
     </div>
     <div id="importArea"></div>
+    <p class="hint" id="sessInfo" style="margin-top:10px"></p>
+    <div>
+      <button class="btn small" id="downloadSessBtn" type="button">Download session record (CSV)</button>
+      <button class="btn small ghost" id="importSessBtn" type="button">Import session record (CSV)</button>
+      <input type="file" id="importSessFile" accept=".csv,text/csv,text/plain" hidden>
+    </div>
+    <div id="importSessArea"></div>
     <details id="csvDetails">
       <summary>Show the CSV text</summary>
       <textarea id="csvText" readonly aria-label="The log as CSV"></textarea>
@@ -180,7 +187,7 @@
 
   /* ---------- the record: localStorage, one key; nothing leaves the phone ---------- */
   const KEY = 'workout-builder:v1';
-  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [], setup: null, pending: null, lastBackup: null });
+  const fresh = () => ({ goal: null, log: [], lastId: null, quarantine: [], setup: null, pending: null, lastBackup: null, sessions: [] });
   /* A built workout that was not logged: its selections and date are kept so it can be offered on the next open. Never logged on its own. */
   function sanitizePending(d) {
     if (!d || typeof d !== 'object' || !d.sel || typeof d.sel !== 'object') return null;
@@ -225,6 +232,7 @@
     const st = fresh();
     if (E.validateGoal(d.goal) === null) st.goal = Number(d.goal);
     (Array.isArray(d.log) ? d.log : []).forEach(r => { if (r && E.validateLogRow(r).length === 0) st.log.push(r); else st.quarantine.push(r); });
+    (Array.isArray(d.sessions) ? d.sessions : []).forEach(r => { if (r && E.validateSessionRow(r).length === 0) st.sessions.push(r); else st.quarantine.push(r); }); // the session record (§10), one row per main exercise
     st.quarantine = st.quarantine.concat(Array.isArray(d.quarantine) ? d.quarantine : []);
     st.lastId = st.log.some(r => r.id === d.lastId) ? d.lastId : null;
     st.setup = sanitizeSetup(d.setup);
@@ -257,7 +265,7 @@
   if (ST.pending) { // the unlogged build comes back on screen: the very workout he saw, with his swaps, when this version built it; else rebuilt from its selections and date
     try {
       S.sel = { time: ST.pending.sel.time, equipment: ST.pending.sel.equipment, machines: ST.pending.sel.machines.slice(), focus: ST.pending.sel.focus, type: ST.pending.sel.type };
-      S.result = (ST.pending.result && ST.pending.result.version === E.APP_VERSION) ? ST.pending.result : E.buildWorkout(LIB, S.sel, ST.log, ST.pending.date); S.stale = false; S.offered = true;
+      S.result = (ST.pending.result && ST.pending.result.version === E.APP_VERSION) ? ST.pending.result : E.buildWorkout(LIB, S.sel, ST.log, ST.pending.date, { sessions: ST.sessions }); S.stale = false; S.offered = true;
     } catch (e) { ST.pending = null; S.result = null; }
   }
   const today = () => E.todayIn();
@@ -393,7 +401,7 @@
       S.result = null; S.stale = false; S.offered = false; ST.pending = null; saveState(); renderRestOffer(decision); $('logArea').innerHTML = '';
       const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
     }
-    try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today(), { checkIn: S.checkIn }); S.stale = false; S.swapping = false; }
+    try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today(), { checkIn: S.checkIn, sessions: ST.sessions }); S.stale = false; S.swapping = false; }
     catch (e) { S.result = null; $('resultArea').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; $('logArea').innerHTML = ''; return; }
     ST.lastId = null; // a new workout on screen: the previous entry stays recorded, but Undo now belongs to the next one
     ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type }, result: S.result }; S.offered = false;
@@ -416,8 +424,10 @@
     // The main block is one or more segments (decision 4): each with its own intro, rows and tail. Older stored builds have no segments list.
     // Each main exercise carries a swap control (decision 5): the next allowed row of the same pattern and load class. It replaces "Also fits".
     const swapBtn = i => S.stale ? '' : ' <button type="button" class="linkbtn swapbtn" data-name="' + esc(i.name) + '" aria-label="Swap ' + esc(i.name) + '">swap</button>';
+    // "Last time" (§10): what he recorded the last time the exercise came up, before this build's date; shown, never turned into a target
+    const lastLine = i => { const lt = E.lastTime(ST.sessions, i.name, { before: w.date }); return lt ? '<small>Last time, ' + esc(E.longDate(lt.date)) + ': ' + esc(lt.text) + '</small>' : ''; };
     const segHtml = (w.main.segments || [w.main]).map(s => '<p class="note">' + esc(s.intro) + '</p><ol>' +
-      s.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + swapBtn(i) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>' +
+      s.items.map(i => '<li>' + (i.tag ? '<b>' + esc(i.tag) + '</b> ' : '') + esc(i.name) + ' · ' + esc(i.text) + swapBtn(i) + lastLine(i) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</li>').join('') + '</ol>' +
       (s.tail ? '<p class="small">' + esc(s.tail) + '</p>' : '')).join('');
     el.innerHTML = stale + '<div class="result' + (S.stale ? ' stale' : '') + '">' +
       '<p class="title">' + esc(w.header.focus) + ' · ' + esc(w.header.type) + (w.header.typeChanged ? ' <span class="sub">(you chose ' + esc(w.header.chosenType) + ')</span>' : '') + ' · ' + w.header.total + ' min</p>' +
@@ -437,7 +447,7 @@
       const used = S.result.main.items.length;
       const offset = (S.offset || 0) + used;
       let next;
-      try { next = E.buildWorkout(LIB, S.sel, ST.log, today(), { startOffset: offset, checkIn: S.checkIn }); }
+      try { next = E.buildWorkout(LIB, S.sel, ST.log, today(), { startOffset: offset, checkIn: S.checkIn, sessions: ST.sessions }); }
       catch (e) { toast('Could not build another: ' + e.message); return; }
       S.offset = offset; S.result = next; S.stale = false; S.swapping = false; ST.lastId = null;
       ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type }, result: S.result }; S.offered = false;
@@ -497,10 +507,17 @@
     };
     const errs = E.validateLogRow(row);
     if (errs.length) { toast('Not recorded: ' + errs[0]); return; }
-    ST.log.push(row); ST.lastId = row.id; S.swapping = false; ST.pending = null; S.offered = false; saveState();
+    ST.log.push(row);
+    E.sessionRowsFromWorkout(w, row, S.performed || null).forEach(s => ST.sessions.push(s)); // RECORD: the exercises as built, with what he did if the workout was performed
+    S.performed = null; ST.lastId = row.id; S.swapping = false; ST.pending = null; S.offered = false; saveState();
     renderGoal(); renderResult(); renderLog();
     const r = $('logArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  const detailLine = r => {
+    const d = ST.sessions.filter(s => s.row_id === r.id), done = d.filter(E.hasDetail).length;
+    if (!d.length) return 'No detail recorded for this entry.';
+    return 'Details saved: ' + d.length + ' exercise' + (d.length === 1 ? '' : 's') + (done ? ', ' + done + ' with what you did.' : ', as built; nothing entered for them.');
+  };
   function renderRecorded(el, row) {
     const count = E.weeklyCount(ST.log, today());
     const counts = row.status === 'skipped' ? 'Skipped does not count toward the goal.' : 'Counts toward this week.';
@@ -508,6 +525,7 @@
     const savedLine = () => 'Saved on this phone: ' + E.longDate(row.date) + ' · ' + row.time_selected_min + ' min · ' + eqLabel + '. Nothing was sent anywhere.';
     el.innerHTML = '<div class="recorded"><h3>Recorded · ' + esc(E.focusLabel(row.focus)) + ' · ' + esc(E.typeLabel(row.type)) + ' · ' + esc(row.status) + '</h3>' +
       '<p class="ok" id="recCount">' + counts + ' This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b>.</p>' +
+      '<p class="hint" id="recDetail">' + esc(detailLine(row)) + '</p>' +
       '<div class="row" style="margin:8px 0 2px"><span class="lbl">How did the time go?</span><div class="chips" id="timeFeel"></div></div>' +
       '<p class="hint" id="recSaved" style="margin:8px 0 4px">' + esc(savedLine()) + '</p>' +
       '<details><summary class="hint">Show the saved row</summary><table class="rowtbl" id="rowTbl"></table></details>' +
@@ -542,6 +560,7 @@
     $('undoBtn').onclick = () => {
       const i = ST.log.findIndex(r => r.id === row.id);
       if (i >= 0) ST.log.splice(i, 1);
+      ST.sessions = ST.sessions.filter(s => s.row_id !== row.id); // its detail rows go with it
       ST.lastId = null; saveState();
       renderGoal(); renderResult(); renderLog(); toast('Entry removed. Nothing is recorded for it.');
     };
@@ -591,6 +610,7 @@
     const last = lb ? 'Last download: ' + E.longDate(lb.date) + ' (' + entries(lb.count) + ').' : 'No download yet.';
     $('backupInfo').textContent = entries(n) + ' on this phone. ' + last + ' The log lives only here: download it once a week. A file exported from this app restores it. On iPhone, Safari and the home-screen app keep separate logs: use one of them, or move the log between them with Download and Import.';
     $('csvText').value = E.serializeLog(ST.log);
+    renderSessInfo();
     /* The reminder (professor, 6): entries on the phone with no download yet, or new entries a week or more after the last one. Never more than a line; never on its own does anything. */
     const newSince = lb ? n - lb.count : n;
     const days = lb ? E.dayIndex(today()) - E.dayIndex(lb.date) : null;
@@ -599,6 +619,53 @@
     if (show) $('backupBannerText').textContent = lb ? entries(newSince) + ' not backed up since your last download on ' + E.longDate(lb.date) + '.' : entries(n) + ' on this phone and no download yet.';
   }
   $('backupBannerBtn').onclick = () => { if (!S.you) $('youBtn').click(); };
+  /* The session record (§10): its own CSV, downloaded and imported beside the log. Rows link to log rows by the app's id, which the log CSV
+     does not carry; after an import, rows whose id matches nothing are linked to the log rows of the same date, in order. Nothing is guessed beyond that. */
+  function relinkSessions(rows, log) {
+    const ids = new Set(log.map(r => r.id));
+    const groups = [], byKey = {};
+    rows.forEach(r => { if (ids.has(r.row_id)) return; const k = r.date + '|' + r.row_id; if (!byKey[k]) { byKey[k] = { date: r.date, from: r.row_id, to: null }; groups.push(byKey[k]); } });
+    const takenPerDate = {};
+    groups.forEach(g => {
+      const cands = log.filter(x => x.date === g.date);
+      const n = takenPerDate[g.date] || 0;
+      if (cands[n]) { g.to = cands[n].id; takenPerDate[g.date] = n + 1; }
+    });
+    return rows.map(r => { if (ids.has(r.row_id)) return r; const g = byKey[r.date + '|' + r.row_id]; return g && g.to ? Object.assign({}, r, { row_id: g.to }) : r; });
+  }
+  const sessFile = () => ({ csv: E.serializeSessions(ST.sessions), name: 'session-record-' + today() + '.csv' });
+  function downloadBlob(text, name) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function renderSessInfo() {
+    const n = ST.sessions.length, linked = ST.sessions.filter(s => ST.log.some(r => r.id === s.row_id)).length;
+    const k = new Set(ST.sessions.map(s => s.row_id)).size;
+    $('sessInfo').textContent = 'Session record: ' + n + ' exercise row' + (n === 1 ? '' : 's') + (n ? ' across ' + entries(k) : '') + (n && linked < n ? '; ' + (n - linked) + ' not linked to an entry' : '') + '. Download it with the log; a file exported from this app restores it.';
+  }
+  $('downloadSessBtn').onclick = () => { const { csv, name } = sessFile(); downloadBlob(csv, name); markBackup(); toast('Download started: ' + name); };
+  $('importSessBtn').onclick = () => { $('importSessFile').value = ''; $('importSessFile').click(); };
+  $('importSessFile').onchange = async () => {
+    const f = $('importSessFile').files && $('importSessFile').files[0];
+    if (!f) return;
+    const text = await f.text(), parsed = E.parseSessions(text), area = $('importSessArea');
+    if (parsed.errors.length) {
+      const shown = parsed.errors.slice(0, 10);
+      area.innerHTML = '<div class="err"><b>Nothing was imported.</b> "' + esc(f.name) + '" has ' + parsed.errors.length + ' problem' + (parsed.errors.length === 1 ? '' : 's') + '; a file is taken whole or not at all.<ul>' +
+        shown.map(e => '<li>' + esc(e) + '</li>').join('') + (parsed.errors.length > 10 ? '<li>… and ' + (parsed.errors.length - 10) + ' more</li>' : '') + '</ul></div>';
+      return;
+    }
+    area.innerHTML = '<div class="card"><h3>Replace the session record on this phone?</h3><p>"' + esc(f.name) + '" holds <b>' + parsed.rows.length + '</b> exercise row' + (parsed.rows.length === 1 ? '' : 's') + '. This phone holds <b>' + ST.sessions.length + '</b>. Rows are linked to the entries of the same date.</p>' +
+      '<button class="btn" id="importSessGo" type="button">Replace with the file</button><button class="btn ghost" id="importSessCancel" type="button">Cancel</button></div>';
+    $('importSessCancel').onclick = () => { area.innerHTML = ''; };
+    $('importSessGo').onclick = () => {
+      ST.sessions = relinkSessions(parsed.rows, ST.log);
+      saveState(); renderResult(); renderLog(); renderSessInfo();
+      area.innerHTML = '<div class="ok">Imported ' + ST.sessions.length + ' exercise row' + (ST.sessions.length === 1 ? '' : 's') + ' from "' + esc(f.name) + '".</div>';
+      toast('Imported the session record');
+    };
+  };
   function markBackup() { ST.lastBackup = { date: today(), count: ST.log.length }; saveState(true); }
   /* Download and Share are separate controls (peer P-08): the share sheet used to pre-empt the download on every browser that could share files. */
   const csvFile = () => { const csv = E.serializeLog(ST.log), name = 'training-log-' + today() + '.csv'; $('csvText').value = csv; return { csv, name }; };
@@ -613,7 +680,9 @@
   }
   async function shareLog() {
     const { csv, name } = csvFile();
-    try { await navigator.share({ files: [new File([csv], name, { type: 'text/csv' })], title: name }); markBackup(); toast('Shared ' + name); }
+    const files = [new File([csv], name, { type: 'text/csv' })];
+    if (ST.sessions.length) { const s = sessFile(); files.push(new File([s.csv], s.name, { type: 'text/csv' })); } // the record travels with the log
+    try { await navigator.share({ files, title: name }); markBackup(); toast('Shared ' + files.map(x => x.name).join(' and ')); }
     catch (e) { if (!(e && e.name === 'AbortError')) toast('Sharing did not work here. Use Download.'); }
   }
   $('downloadBtn').onclick = downloadLog;
@@ -644,13 +713,14 @@
     $('importGo').onclick = () => {
       S.importUndo = ST.log.slice();
       ST.log = parsed.rows.map(r => Object.assign({ id: newId() }, r));
+      ST.sessions = relinkSessions(ST.sessions, ST.log); // the ids are new: detail rows re-attach to the entries of their date, in order
       ST.lastId = null;
       saveState(true);
       renderGoal(); renderResult(); renderLog();
       area.innerHTML = '<div class="ok">Imported ' + ST.log.length + ' entr' + (ST.log.length === 1 ? 'y' : 'ies') + ' from "' + esc(f.name) + '". <button class="btn small ghost" id="importUndoBtn" type="button">Undo import</button></div>';
       $('importUndoBtn').onclick = () => {
         if (!S.importUndo) { toast('The import can no longer be undone: the log changed since.'); area.innerHTML = ''; return; }
-        ST.log = S.importUndo; S.importUndo = null; ST.lastId = null; saveState();
+        ST.log = S.importUndo; ST.sessions = relinkSessions(ST.sessions, ST.log); S.importUndo = null; ST.lastId = null; saveState();
         renderGoal(); renderResult(); renderLog(); area.innerHTML = ''; toast('Import undone');
       };
       toast('Imported ' + ST.log.length + ' entries');
