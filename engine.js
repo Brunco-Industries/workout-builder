@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.7.2'; // D5 TEMPLATE: start from the last session for the focus; swap, add or drop; the same checks
+  const APP_VERSION = '0.7.3'; // D3 REVIEW: a History screen; every entry with its detail, previous and next, corrections, bests per exercise
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */

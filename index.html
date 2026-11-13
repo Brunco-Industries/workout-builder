@@ -114,11 +114,23 @@
   .perf .ctl .btn{margin:0}
   .perf .prog{height:6px;background:var(--chip);border-radius:3px;overflow:hidden;margin:4px 0 8px}
   .perf .prog div{height:100%;background:var(--accent)}
+  /* history: every entry, its detail, his bests */
+  .hist .entry{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font:inherit;background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left;color:var(--ink)}
+  .hist .entry:last-child{border-bottom:0}
+  .hist .entry b{font-size:.95rem}
+  .hist .entry span{color:var(--muted);font-size:.86rem;white-space:nowrap}
+  table.dtl{border-collapse:collapse;width:100%;font-size:.84rem;margin:8px 0}
+  table.dtl th,table.dtl td{border:1px solid var(--line);padding:4px;vertical-align:top;text-align:left}
+  table.dtl th{background:var(--chip);font-weight:600}
+  table.dtl input,table.dtl select{font:inherit;font-size:.84rem;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);width:100%;min-width:3.2rem}
+  table.dtl input[type=number]{max-width:5rem}
+  .navrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+  .dtlwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px} /* ten columns: the table scrolls sideways inside its card on a phone */
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="head"><h1>Workout builder</h1><button type="button" class="navbtn" id="youBtn" aria-pressed="false">You</button></div>
+  <div class="head"><h1>Workout builder</h1><span><button type="button" class="navbtn" id="historyBtn" aria-pressed="false">History</button> <button type="button" class="navbtn" id="youBtn" aria-pressed="false">You</button></span></div>
   <div id="updateBanner" class="banner update" hidden><span>A new version is ready.</span><button type="button" id="reloadBtn">Reload</button></div>
   <div id="backupBanner" class="banner update" hidden><span id="backupBannerText"></span><button type="button" id="backupBannerBtn">Open You</button></div>
   <div id="storageBanner" class="banner" hidden></div>
@@ -155,6 +167,7 @@
   </div>
 
   <div id="performView" hidden></div>
+  <div id="historyView" hidden></div>
 
   <div id="youView" hidden>
   <section class="card backup" id="backup">
@@ -289,11 +302,16 @@
   const today = () => E.todayIn();
   $('footer').textContent = 'Workout builder ' + E.APP_VERSION + ' · the log stays on this phone';
   /* The You screen: the log backup and the version line live here, off the main screen. Nothing on it changes a selection or the log on its own. */
-  S.you = false;
-  $('youBtn').onclick = () => {
-    S.you = !S.you; $('mainView').hidden = S.you; $('youView').hidden = !S.you;
-    $('youBtn').textContent = S.you ? 'Back' : 'You'; $('youBtn').setAttribute('aria-pressed', S.you ? 'true' : 'false'); window.scrollTo(0, 0);
-  };
+  S.you = false; S.history = false;
+  function showViews() {
+    $('mainView').hidden = S.you || S.history; $('youView').hidden = !S.you; $('historyView').hidden = !S.history;
+    $('youBtn').textContent = S.you ? 'Back' : 'You'; $('youBtn').setAttribute('aria-pressed', S.you ? 'true' : 'false');
+    $('historyBtn').textContent = S.history ? 'Back' : 'History'; $('historyBtn').setAttribute('aria-pressed', S.history ? 'true' : 'false');
+    $('youBtn').hidden = S.history; $('historyBtn').hidden = S.you;
+    window.scrollTo(0, 0);
+  }
+  $('youBtn').onclick = () => { S.you = !S.you; S.history = false; showViews(); };
+  $('historyBtn').onclick = () => { S.history = !S.history; S.you = false; if (S.history) { H.open = null; renderHistory(); } showViews(); };
   renderStorageBanner();
 
   /* A toast lasts about two seconds, and goes sooner on the next tap or scroll, so a message never outstays what it was about. */
@@ -549,7 +567,8 @@
   const perfOf = name => { const P = S.perf; if (!P.performed[name]) P.performed[name] = {}; return P.performed[name]; };
   function persistPerform() { if (ST.pending && S.perf) { ST.pending.perform = { i: S.perf.i, performed: S.perf.performed, unit: S.perf.unit }; saveState(true); } }
   function showPerform(on) {
-    $('performView').hidden = !on; $('mainView').hidden = on || S.you; $('youView').hidden = on || !S.you; $('youBtn').hidden = on;
+    $('performView').hidden = !on; $('mainView').hidden = on || S.you || S.history; $('youView').hidden = on || !S.you; $('historyView').hidden = on || !S.history;
+    $('youBtn').hidden = on || S.history; $('historyBtn').hidden = on || S.you;
     document.querySelector('.head h1').textContent = on ? 'Workout' : 'Workout builder';
     window.scrollTo(0, 0);
   }
@@ -728,6 +747,81 @@
       ST.lastId = null; saveState();
       renderGoal(); renderBuild(); renderResult(); renderLog(); toast('Entry removed. Nothing is recorded for it.');
     };
+  }
+
+  /* ---------- story 7, REVIEW: every entry, newest first; open one with previous and next; correct it; his best per exercise ---------- */
+  const H = { open: null };
+  const sortedLog = () => ST.log.map((r, i) => ({ r, i })).sort((a, b) => (b.r.date > a.r.date ? 1 : b.r.date < a.r.date ? -1 : b.i - a.i)).map(x => x.r);
+  function renderHistory() {
+    const v = $('historyView');
+    if (H.open) { renderEntry(v); return; }
+    const rows = sortedLog();
+    const bests = E.bestPerExercise(ST.sessions);
+    let b = '<section class="card hist"><h3>Your entries</h3>' + (rows.length ? '<p class="hint">Newest first. Tap one to see its detail and correct it.</p>' : '<p class="hint">No entries yet. Logged workouts appear here.</p>');
+    b += rows.map(r => { const n = ST.sessions.filter(s => s.row_id === r.id).length; return '<button type="button" class="entry" data-id="' + esc(r.id) + '"><b>' + esc(E.longDate(r.date)) + ' · ' + esc(E.focusLabel(r.focus)) + ' · ' + esc(E.typeLabel(r.type)) + '</b><span>' + esc(r.status) + ' · ' + r.time_selected_min + ' min' + (n ? ' · ' + n + ' ex.' : '') + '</span></button>'; }).join('') + '</section>';
+    b += '<section class="card hist"><h3>Your best per exercise</h3>' + (bests.length ? '<p class="hint">From the numbers you recorded, nothing else: the heaviest load, else the most reps, else the longest time, with the day it comes from.</p><ul>' +
+      bests.map(x => '<li>' + esc(x.exercise) + ' <span>' + esc(E.bestText(x)) + ' · ' + esc(E.longDate(x.date)) + '</span></li>').join('') + '</ul>' : '<p class="hint">No numbers recorded yet. Enter reps, loads or times while you perform a workout, or add them to an entry here.</p>') + '</section>';
+    v.innerHTML = b;
+    v.querySelectorAll('.entry').forEach(x => x.onclick = () => { H.open = x.getAttribute('data-id'); renderHistory(); window.scrollTo(0, 0); });
+  }
+  function renderEntry(v) {
+    const rows = sortedLog(), idx = rows.findIndex(r => r.id === H.open), row = rows[idx];
+    if (!row) { H.open = null; renderHistory(); return; }
+    const det = ST.sessions.filter(s => s.row_id === row.id).sort((a, b) => Number(a.order) - Number(b.order));
+    const eqLabel = (E.EQUIPMENT.find(e => e.key === row.equipment) || {}).label || row.equipment;
+    const v0 = x => x === '' || x === null || x === undefined ? '' : x;
+    let b = '<div class="navrow"><button type="button" class="btn ghost small" id="hPrev"' + (idx <= 0 ? ' disabled' : '') + '>← Newer</button><button type="button" class="btn ghost small" id="hNext"' + (idx >= rows.length - 1 ? ' disabled' : '') + '>Older →</button></div>';
+    b += '<section class="card"><h3>' + esc(E.longDate(row.date)) + ' · ' + esc(E.focusLabel(row.focus)) + ' · ' + esc(E.typeLabel(row.type)) + ' · ' + esc(row.status) + '</h3>' +
+      '<p class="hint">' + esc(eqLabel) + ' · ' + row.time_selected_min + ' min selected' + (row.note ? ' · ' + esc(row.note) : '') + '. Entry ' + (idx + 1) + ' of ' + rows.length + '.</p>' +
+      '<div class="field"><label for="hDate" class="lbl">Date trained</label><input id="hDate" type="date" value="' + esc(row.date) + '" max="' + esc(today()) + '"></div>' +
+      '<div class="field"><label for="hMin" class="lbl">Actual minutes</label><input id="hMin" type="number" inputmode="numeric" min="1" max="300" placeholder="blank stays blank" value="' + esc(v0(row.actual_min)) + '"></div>' +
+      '<div class="field"><label for="hNote" class="lbl">Note</label><input id="hNote" type="text" placeholder="your words" value="' + esc(row.note) + '"></div>' +
+      '<p class="ferr" id="hErr" hidden></p></section>';
+    b += '<section class="card"><h3>Detail</h3>';
+    if (!det.length) b += '<p class="hint">No detail recorded for this entry.</p>';
+    else {
+      b += '<p class="hint">What was built and what you did. A blank stays blank; correct any cell. Loads are yours and are never turned into a target.</p>' +
+        '<table class="dtl"><thead><tr><th>#</th><th>Exercise</th><th>Built</th><th>Sets</th><th>Reps</th><th>Time s</th><th>Load</th><th>Unit</th><th>Feel</th><th>Skip</th></tr></thead><tbody>' +
+        det.map((s, k) => '<tr data-k="' + k + '"><td>' + s.order + '</td><td>' + esc(s.exercise) + '</td><td>' + esc(s.prescribed) + '</td>' +
+          '<td><input type="number" inputmode="numeric" min="0" data-f="done_sets" value="' + esc(v0(s.done_sets)) + '"></td>' +
+          '<td><input type="number" inputmode="numeric" min="0" data-f="done_reps" value="' + esc(v0(s.done_reps)) + '"></td>' +
+          '<td><input type="number" inputmode="numeric" min="0" data-f="done_time" value="' + esc(v0(s.done_time)) + '"></td>' +
+          '<td><input type="number" inputmode="decimal" min="0" step="0.5" data-f="load" value="' + esc(v0(s.load)) + '"></td>' +
+          '<td><select data-f="unit"><option value=""' + (s.unit === '' ? ' selected' : '') + '>–</option>' + E.UNITS.map(u => '<option value="' + u + '"' + (s.unit === u ? ' selected' : '') + '>' + u + '</option>').join('') + '</select></td>' +
+          '<td><select data-f="feel"><option value=""' + (s.feel === '' ? ' selected' : '') + '>–</option>' + E.FEELS.map(f => '<option value="' + f.key + '"' + (s.feel === f.key ? ' selected' : '') + '>' + esc(f.label) + '</option>').join('') + '</select></td>' +
+          '<td><select data-f="skipped"><option value="no"' + (s.skipped === 'no' ? ' selected' : '') + '>no</option><option value="yes"' + (s.skipped === 'yes' ? ' selected' : '') + '>yes</option></select></td></tr>').join('') +
+        '</tbody></table></div><p class="ferr" id="dErr" hidden></p>';
+    }
+    b += '</section>';
+    v.innerHTML = b;
+    $('hPrev').onclick = () => { H.open = rows[idx - 1].id; renderHistory(); window.scrollTo(0, 0); };
+    $('hNext').onclick = () => { H.open = rows[idx + 1].id; renderHistory(); window.scrollTo(0, 0); };
+    const after = () => { saveState(); renderGoal(); renderBuild(); renderResult(); renderLog(); };
+    $('hDate').onchange = () => {
+      const val = $('hDate').value, e = $('hErr');
+      if (!E.isDate(val) || val > today()) { e.hidden = false; e.textContent = 'The date must be a real day, today or earlier.'; $('hDate').value = row.date; return; }
+      e.hidden = true; row.date = val; row.week_start = E.mondayOf(val);
+      ST.sessions.forEach(s => { if (s.row_id === row.id) s.date = val; }); // its detail rows carry the same day
+      after(); renderHistory();
+    };
+    $('hMin').oninput = () => {
+      const val = $('hMin').value.trim(), e = $('hErr');
+      if (val !== '' && (!/^\d+$/.test(val) || Number(val) < 1)) { e.hidden = false; e.textContent = 'Actual minutes must be a whole number of at least 1, or left blank.'; return; }
+      e.hidden = true; row.actual_min = val === '' ? '' : Number(val); after();
+    };
+    $('hNote').oninput = () => { row.note = $('hNote').value; after(); };
+    v.querySelectorAll('table.dtl [data-f]').forEach(inp => inp.onchange = () => {
+      const tr = inp.closest('tr'), s = det[Number(tr.getAttribute('data-k'))], f = inp.getAttribute('data-f'), e = $('dErr');
+      const raw = inp.value.trim();
+      const trial = Object.assign({}, s);
+      trial[f] = raw === '' ? '' : (['done_sets', 'done_reps', 'done_time'].includes(f) ? (/^\d+$/.test(raw) ? Number(raw) : raw) : f === 'load' ? (/^\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw) : raw);
+      if (f === 'load' && raw !== '' && trial.unit === '') trial.unit = 'kg'; // a load needs a unit; kg until he picks lb
+      const errs = E.validateSessionRow(trial);
+      if (errs.length) { e.hidden = false; e.textContent = 'Not saved: ' + errs[0]; return; }
+      e.hidden = true; Object.assign(s, trial);
+      if (f === 'load' && raw !== '' && s.unit) tr.querySelector('[data-f=unit]').value = s.unit;
+      saveState(); renderResult();
+    });
   }
 
   /* ---------- a workout done without a build (spec v1.6): logged from its own card, never on its own ---------- */
