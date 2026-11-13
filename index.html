@@ -124,6 +124,14 @@
   <div class="row" id="machineRow" hidden><span class="lbl">Machines here (tick any)</span><div class="chips" id="machineChips"></div></div>
   <div class="row"><span class="lbl">Focus</span><div class="chips" id="focusChips"></div></div>
   <div class="row"><span class="lbl">Type</span><div class="chips" id="typeChips"></div></div>
+  <section id="checkIn" aria-label="Check-in, optional">
+    <p class="needs">Check-in (optional): energy from 1, drained, to 5, fresh, and any soreness. It can take a round off, or offer a rest day, and always says why. Tap an answer again to clear it.</p>
+    <div class="row"><span class="lbl">Energy</span><div class="chips" id="energyChips"></div></div>
+    <div class="row"><span class="lbl">Upper body</span><div class="chips" id="soreUpper"></div></div>
+    <div class="row"><span class="lbl">Lower body</span><div class="chips" id="soreLower"></div></div>
+    <div class="row"><span class="lbl">Core</span><div class="chips" id="soreCore"></div></div>
+    <p class="hint" id="checkInLine"></p>
+  </section>
 
   <button class="btn" id="buildBtn" type="button" disabled>Choose time, equipment, focus and type</button>
   <p class="hint" id="splitHint"></p>
@@ -351,7 +359,25 @@
     const m = []; if (S.sel.time === null) m.push('time'); if (!S.sel.equipment) m.push('equipment'); if (!S.sel.focus) m.push('focus'); if (!S.sel.type) m.push('type'); return m;
   }
   const joinAnd = a => a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  /* The check-in (§9): optional; unanswered adapts nothing. Answers live with this screen and ride with the built workout, never with the log. */
+  S.checkIn = { energy: null, soreness: { upper: null, lower: null, core: null } };
+  function renderCheckIn() {
+    chipRow('energyChips', E.ENERGY.map(n => [n, String(n)]), k => S.checkIn.energy === Number(k), k => { S.checkIn.energy = S.checkIn.energy === Number(k) ? null : Number(k); changed(); });
+    E.AREAS.forEach(a => chipRow('sore' + a.key.charAt(0).toUpperCase() + a.key.slice(1), E.SORENESS.map(s => [s, s]), k => S.checkIn.soreness[a.key] === k,
+      k => { S.checkIn.soreness[a.key] = S.checkIn.soreness[a.key] === k ? null : k; changed(); }));
+    let line = '';
+    if (S.sel.focus) { try { line = E.checkInDecision(S.sel, S.checkIn).line; } catch (e) { line = ''; } }
+    $('checkInLine').textContent = line;
+  }
+  function renderRestOffer(d) {
+    const alts = d.alternatives.map(k => '<button type="button" class="chip" data-focus="' + esc(k) + '">' + esc(E.focusLabel(k)) + '</button>').join('');
+    $('resultArea').innerHTML = '<div class="card"><h3>A rest day is offered</h3><p>' + esc(d.line) + '</p>' +
+      (alts ? '<p class="hint">Or choose a focus the soreness does not touch, then tap Build:</p><div class="chips">' + alts + '</div>' : '') +
+      '<p class="small">Nothing was built or logged. If this is pain or an injury, stop and see a professional.</p></div>';
+    $('resultArea').querySelectorAll('[data-focus]').forEach(b => b.onclick = () => { S.sel.focus = b.getAttribute('data-focus'); changed(); });
+  }
   function renderBuild() {
+    renderCheckIn();
     const m = missing(), b = $('buildBtn'), h = $('splitHint');
     if (m.length) { b.disabled = true; b.textContent = 'Choose ' + joinAnd(m); $('needsLine').textContent = 'Still needed: ' + joinAnd(m) + '.'; h.textContent = ''; return; }
     const bm = E.blockMinutes(S.sel.time);
@@ -361,7 +387,13 @@
   }
   $('buildBtn').onclick = () => {
     S.offset = 0; // a fresh build starts the rotation where the day and the log put it; "build another" moves it on from there
-    try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today()); S.stale = false; S.swapping = false; }
+    let decision;
+    try { decision = E.checkInDecision(S.sel, S.checkIn); } catch (e) { toast('Check-in: ' + e.message); return; }
+    if (decision.action === 'rest') { // §9: no workout is built; he decides, and nothing is logged
+      S.result = null; S.stale = false; S.offered = false; ST.pending = null; saveState(); renderRestOffer(decision); $('logArea').innerHTML = '';
+      const r = $('resultArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
+    }
+    try { S.result = E.buildWorkout(LIB, S.sel, ST.log, today(), { checkIn: S.checkIn }); S.stale = false; S.swapping = false; }
     catch (e) { S.result = null; $('resultArea').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; $('logArea').innerHTML = ''; return; }
     ST.lastId = null; // a new workout on screen: the previous entry stays recorded, but Undo now belongs to the next one
     ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type }, result: S.result }; S.offered = false;
@@ -405,7 +437,7 @@
       const used = S.result.main.items.length;
       const offset = (S.offset || 0) + used;
       let next;
-      try { next = E.buildWorkout(LIB, S.sel, ST.log, today(), { startOffset: offset }); }
+      try { next = E.buildWorkout(LIB, S.sel, ST.log, today(), { startOffset: offset, checkIn: S.checkIn }); }
       catch (e) { toast('Could not build another: ' + e.message); return; }
       S.offset = offset; S.result = next; S.stale = false; S.swapping = false; ST.lastId = null;
       ST.pending = { date: today(), sel: { time: S.sel.time, equipment: S.sel.equipment, machines: S.sel.machines.slice(), focus: S.sel.focus, type: S.sel.type }, result: S.result }; S.offered = false;

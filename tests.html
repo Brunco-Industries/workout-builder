@@ -175,6 +175,22 @@
     return { actual: w.main.items[0].name + ' → (offset ' + n + ') ' + w2.main.items[0].name + '; blocks ' + (sameBlocks ? 'same' : 'DIFFER') + '; violations: ' + (v.join('; ') || 'none') + '; offset 0 ' + (w0.text === w.text ? 'identical' : 'DIFFERS') + '; offset −3 ' + (wb.text === w.text ? 'identical' : 'DIFFERS') + '; startOffset recorded ' + w2.startOffset,
       pass: w2.main.items[0].name !== w.main.items[0].name && sameBlocks && v.length === 0 && w0.text === w.text && wb.text === w.text && w2.startOffset === n };
   });
+  await check('U23', 'C7 check-in (§9): refused values; unanswered adapts nothing and says so; energy 2 or moderate soreness in a trained area takes one round off every pair and circuit, the freed minutes as easy movement, sum exact; soreness outside the focus adapts nothing; energy 1 or severe soreness offers rest and builds nothing; alternatives leave out the sore focuses', 'refusals 1/1/1; "No check-in; nothing adapted."; reduce: per-pair drop ok, easy = freed, audit clean, first line says why; outside: nothing adapted; circuit −1 round; rest throws; alternatives exclude lower and total, include upper', () => {
+    const bad = [E.validateCheckIn({ energy: 0 }).length, E.validateCheckIn({ energy: '3' }).length, E.validateCheckIn({ soreness: { upper: 'bad' } }).length];
+    const s = sel(60, 'full-gym', 'lower', 'strength');
+    const none = E.buildWorkout(lib, s, [], TODAY, { checkIn: { energy: null, soreness: {} } });
+    const base = E.buildWorkout(lib, s, [], TODAY), red = E.buildWorkout(lib, s, [], TODAY, { checkIn: { energy: 2 } });
+    const seg0 = base.main.segments[0], segR = red.main.segments[0];
+    const perPairDrop = seg0.items.every((it, i) => it.sets - segR.items[i].sets === (it.sets > 2 ? 1 : 0));
+    const v = E.audit(red, lib);
+    const outside = E.buildWorkout(lib, s, [], TODAY, { checkIn: { soreness: { upper: 'moderate' } } });
+    const cs = sel(45, 'full-gym', 'upper', 'endurance');
+    const circ = E.buildWorkout(lib, cs, [], TODAY, { checkIn: { soreness: { upper: 'moderate' } } }), circBase = E.buildWorkout(lib, cs, [], TODAY);
+    let restThrew = false; try { E.buildWorkout(lib, s, [], TODAY, { checkIn: { energy: 1 } }); } catch (e) { restThrew = e instanceof RangeError; }
+    const d = E.checkInDecision(s, { soreness: { lower: 'severe' } });
+    return { actual: 'refusals ' + bad.join('/') + '; unanswered "' + none.notes[0] + '"; reduce "' + red.notes[0] + '", rounds ' + seg0.rounds + ' → ' + segR.rounds + ', per-pair drop ' + (perPairDrop ? 'ok' : 'WRONG') + ', easy ' + red.main.easyMinutes + ', tail "' + red.main.tail + '", sum ' + red.check.sum + ' of ' + red.check.total + ', violations: ' + (v.join('; ') || 'none') + '; outside "' + outside.notes[0] + '", easy ' + (outside.main.easyMinutes || 0) + '; circuit ' + circBase.main.segments[0].rounds + ' → ' + circ.main.segments[0].rounds + ' rounds, easy ' + circ.main.easyMinutes + '; rest ' + (restThrew ? 'throws' : 'NO THROW') + '; alternatives ' + d.alternatives.join(',') + '; "' + d.line + '"',
+      pass: bad.every(n => n === 1) && none.notes[0] === 'No check-in; nothing adapted.' && /^Energy 2: one round fewer/.test(red.notes[0]) && perPairDrop && red.main.easyMinutes === (seg0.rounds - segR.rounds) * seg0.roundMinutes && /Easy movement/.test(red.main.tail) && red.check.sum === red.check.total && v.length === 0 && /nothing adapted/.test(outside.notes[0]) && !outside.main.easyMinutes && circ.main.segments[0].rounds === circBase.main.segments[0].rounds - 1 && restThrew && d.action === 'rest' && !d.alternatives.includes('lower') && !d.alternatives.includes('total') && d.alternatives.includes('upper') };
+  });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
     const a = offered(['treadmill']), b = offered(['treadmill', 'sled', 'stairclimber']);

@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.6.7'; // C11: a build-another control moves the rotation on by the exercises used (decision 19)
+  const APP_VERSION = '0.6.8'; // C7: the optional check-in, energy and soreness (§9, decision 11)
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -385,6 +385,97 @@
     return pairs;
   }
 
+  /* The intro lines, shared with the check-in's reduction (§9), which rewrites them after taking a round off. */
+  const pairsIntro = (type, cfg, effort, single, R, roundsPerPair, roundLen, ramp) => {
+    const lo = Math.min.apply(null, roundsPerPair), hi = Math.max.apply(null, roundsPerPair);
+    return typeLabel(type) + ': ' + cfg.reps + ' reps, ' + effort + '. ' +
+      (single ? 'Straight sets; ' + R + ' sets' : 'A1, rest, A2, rest; ' + (lo === hi ? lo : lo + '–' + hi) + ' rounds per pair') + ', about ' + roundLen + ' min a round.' +
+      (ramp ? ' Each barbell lift starts with a 1-minute ramp-up.' : '');
+  };
+  const circuitIntro = (S, N, effort) => {
+    const c = TIMING.endurance;
+    return 'Endurance circuit: ' + c.stationSeconds + ' s work, ' + c.changeSeconds + ' s change-over, ' + c.roundRestSeconds + ' s rest after each round. ' +
+      S + ' station' + (S === 1 ? '' : 's') + ' × ' + N + ' rounds. Effort: ' + effort + '.';
+  };
+
+  /* ---------- the check-in (workout-rules.md §9, [PROPOSED] 2026-11-12, adapted from the team's S4 rule in Jason's build) ---------- */
+  const ENERGY = [1, 2, 3, 4, 5];
+  const AREAS = [{ key: 'upper', label: 'Upper body' }, { key: 'lower', label: 'Lower body' }, { key: 'core', label: 'Core' }];
+  const SORENESS = ['none', 'moderate', 'severe'];
+  /* The areas a focus trains, for "an area the focus trains": a team mapping, [PROPOSED] until Stephen confirms it. */
+  const FOCUS_AREAS = { upper: ['upper'], lower: ['lower'], total: ['upper', 'lower', 'core'], core: ['core'], cardio: ['lower'] };
+  const MIN_PAIR_ROUNDS = 2; // a pair never drops below 2 rounds when the check-in reduces (a team floor, [PROPOSED])
+  const unanswered = v => v === undefined || v === null || v === '';
+  function validateCheckIn(c) {
+    const errs = [];
+    if (unanswered(c)) return errs;
+    if (typeof c !== 'object') return ['The check-in must be an object.'];
+    if (!unanswered(c.energy) && !(Number.isInteger(c.energy) && c.energy >= 1 && c.energy <= 5)) errs.push('Energy must be a whole number from 1 to 5, or unanswered.');
+    const s = c.soreness;
+    if (!unanswered(s)) {
+      if (typeof s !== 'object') errs.push('Soreness must name areas.');
+      else Object.keys(s).forEach(k => {
+        if (!AREAS.some(a => a.key === k)) errs.push('Unknown soreness area: ' + k + '.');
+        else if (!unanswered(s[k]) && !SORENESS.includes(s[k])) errs.push('Soreness for ' + k + ' must be none, moderate or severe, or unanswered.');
+      });
+    }
+    return errs;
+  }
+  /* What the check-in does to this selection: nothing, reduce (one round fewer on every pair and circuit), or rest (no workout is built).
+     The line says what changed and why, never a cause or a diagnosis. */
+  function checkInDecision(sel, c) {
+    const errs = validateCheckIn(c);
+    if (errs.length) throw new RangeError(errs.join(' '));
+    const energy = c && !unanswered(c.energy) ? c.energy : null;
+    const sore = {}; AREAS.forEach(a => { const v = c && c.soreness ? c.soreness[a.key] : null; sore[a.key] = unanswered(v) ? null : v; });
+    const answered = energy !== null || AREAS.some(a => sore[a.key] !== null);
+    const label = k => AREAS.find(a => a.key === k).label.toLowerCase();
+    const trained = FOCUS_AREAS[sel.focus] || [];
+    const severe = trained.filter(k => sore[k] === 'severe'), moderate = trained.filter(k => sore[k] === 'moderate');
+    const reasons = [];
+    let action = 'none';
+    if (energy === 1) { action = 'rest'; reasons.push('energy 1'); }
+    if (severe.length) { action = 'rest'; reasons.push('severe soreness (' + severe.map(label).join(', ') + ')'); }
+    if (action !== 'rest') {
+      if (energy === 2) { action = 'reduce'; reasons.push('energy 2'); }
+      if (moderate.length) { action = 'reduce'; reasons.push('moderate soreness (' + moderate.map(label).join(', ') + ')'); }
+    }
+    const why = reasons.join(' and ').replace(/^./, ch => ch.toUpperCase());
+    const alternatives = (action === 'rest' && energy !== 1) ? FOCUS.map(f => f.key).filter(k => k !== sel.focus && !(FOCUS_AREAS[k] || []).some(a => sore[a] === 'severe')) : [];
+    let line;
+    if (!answered) line = 'No check-in; nothing adapted.';
+    else if (action === 'none') line = 'Check-in: ' + (energy !== null ? 'energy ' + energy : 'energy not given') + ', ' + (AREAS.some(a => sore[a.key] && sore[a.key] !== 'none') ? 'soreness outside this focus' : 'no soreness reported') + '; nothing adapted.';
+    else if (action === 'reduce') line = why + ': one round fewer on every pair and circuit; the minutes freed are easy movement.';
+    else line = why + ': a rest day is offered' + (alternatives.length ? ', or ' + alternatives.map(focusLabel).join(' or ') + ', which the soreness does not touch' : '') + '. You decide; nothing is logged.';
+    return { action, reasons, line, alternatives, answered, energy, soreness: sore };
+  }
+  /* Reduce: one round fewer on every pair (never below MIN_PAIR_ROUNDS) and on every circuit (never below its minimum). Returns the minutes freed. */
+  function reduceRounds(main, library) {
+    let freed = 0;
+    main.segments.forEach(s => {
+      if (s.kind === 'pairs') {
+        const groups = {};
+        s.items.forEach(i => { const m = /^([A-Z])[12]$/.exec(i.tag), g = m ? m[1] : i.tag; (groups[g] = groups[g] || []).push(i); });
+        let removed = 0; const roundsPerPair = [];
+        Object.keys(groups).sort().forEach(g => {
+          const its = groups[g];
+          if (its.every(i => i.sets > MIN_PAIR_ROUNDS)) {
+            its.forEach(i => { i.sets -= 1; const row = findRow(library, i.name); i.text = (row && row.loadClass === 'barbell' ? '1 min ramp-up, then ' : '') + prescribe(row, s.type, i.sets, i.rest); });
+            removed++;
+          }
+          roundsPerPair.push(its[0].sets);
+        });
+        s.rounds -= removed; s.minutesUsed -= removed * s.roundMinutes; freed += removed * s.roundMinutes; s.roundsPerPair = roundsPerPair;
+        s.intro = pairsIntro(s.type, TIMING[s.type], s.effort, s.single, s.rounds, roundsPerPair, s.roundMinutes, s.rampUpMinutes);
+      } else if (s.kind === 'circuit' && s.rounds > TIMING.endurance.minRounds) {
+        s.rounds -= 1; s.minutesUsed -= s.stations + 1; freed += s.stations + 1;
+        s.items.forEach(i => { const row = findRow(library, i.name); i.text = s.rounds + ' × ' + TIMING.endurance.stationSeconds + ' s' + (row && row.perSide ? ', switch sides halfway' : ''); });
+        s.intro = circuitIntro(s.stations, s.rounds, s.effort);
+      }
+    });
+    return freed;
+  }
+
   /* ---------- main block: strength and power as paired rounds ---------- */
   function pairsBlock(ctx, pool, main, type, minRounds) {
     const cfg = TIMING[type];
@@ -442,13 +533,10 @@
       });
     }
     const minutesUsed = R * roundLen + ramp;
-    const lo = Math.min.apply(null, roundsPerPair), hi = Math.max.apply(null, roundsPerPair);
     const effort = effortFor(ctx.sel, type);
-    const intro = typeLabel(type) + ': ' + cfg.reps + ' reps, ' + effort + '. ' +
-      (single ? 'Straight sets; ' + R + ' sets' : 'A1, rest, A2, rest; ' + (lo === hi ? lo : lo + '–' + hi) + ' rounds per pair') + ', about ' + roundLen + ' min a round.' +
-      (ramp ? ' Each barbell lift starts with a 1-minute ramp-up.' : '');
-    return { kind: 'pairs', type, roundMinutes: roundLen, rounds: R, pairs: single ? 0 : items.length / 2, items, remainder: 0, minutesUsed, rampUpMinutes: ramp, capped,
-      intro, tail: '', used: items.map(i => i.name) };
+    const intro = pairsIntro(type, cfg, effort, !!single, R, roundsPerPair, roundLen, ramp);
+    return { kind: 'pairs', type, roundMinutes: roundLen, rounds: R, roundsPerPair, pairs: single ? 0 : items.length / 2, items, remainder: 0, minutesUsed, rampUpMinutes: ramp, capped,
+      effort, single: !!single, intro, tail: '', used: items.map(i => i.name) };
   }
 
   /* ---------- main block: endurance as a circuit ---------- */
@@ -488,10 +576,9 @@
       prev = row;
     }
     if (items.length < pick.S) return bail(); // never a station without a row
-    const intro = 'Endurance circuit: ' + c.stationSeconds + ' s work, ' + c.changeSeconds + ' s change-over, ' + c.roundRestSeconds + ' s rest after each round. ' +
-      pick.S + ' station' + (pick.S === 1 ? '' : 's') + ' × ' + pick.N + ' rounds. Effort: ' + effortFor(ctx.sel, 'endurance') + '.';
+    const effort = effortFor(ctx.sel, 'endurance');
     return { kind: 'circuit', type: 'endurance', stations: pick.S, rounds: pick.N, items, remainder: 0, minutesUsed: pick.N * (pick.S + 1),
-      intro, tail: '', used: items.map(i => i.name) };
+      effort, intro: circuitIntro(pick.S, pick.N, effort), tail: '', used: items.map(i => i.name) };
   }
 
   /* ---------- main block: cardio as one modality (exercise-reference.md §5) ---------- */
@@ -619,6 +706,27 @@
     const ctx = { library, sel, notes: ae.notes.slice(), start: dayIndex(today) + focusCount(log, sel.focus) + startOffset, usedMain: new Set(), mainMinutes: b.main };
     const main = sel.focus === 'cardio' ? composeMain([Object.assign(cardioBlock(ctx, ae.pool, b.main, type), { type })], b.main)
       : fillMain(ctx, ae.pool, b.main, type, sel.focus === 'core' ? b.minCore : 0);
+    /* The check-in (§9): applied after the fill, so the minutes a reduction frees stay free, as easy movement at the end of the block. */
+    let checkIn = null;
+    if (opts && opts.checkIn !== undefined) {
+      const d = checkInDecision(sel, opts.checkIn);
+      if (d.action === 'rest') throw new RangeError('The check-in offers rest; no workout is built. ' + d.line);
+      if (d.action === 'reduce') {
+        const freed = reduceRounds(main, library);
+        main.easyMinutes = freed;
+        main.minutesUsed = main.segments.reduce((a, s) => a + s.minutesUsed, 0);
+        main.remainder = b.main - main.minutesUsed;
+        const last = main.segments[main.segments.length - 1], spare = main.remainder - freed;
+        last.remainder = main.remainder;
+        last.tail = (spare ? (last.kind === 'circuit' ? 'Change-over · ' : last.kind === 'cardio' ? 'Easy finish · ' : 'Set-up and change-over · ') + spare + ' min' : '') +
+          (freed ? (spare ? ' · ' : '') + 'Easy movement · ' + freed + ' min (from the check-in: walk, cycle easy or stretch)' : '');
+        main.tail = last.tail;
+        main.items = [].concat.apply([], main.segments.map(s => s.items)); main.used = main.items.map(i => i.name);
+        if (main.segments.length === 1) ['rounds', 'roundsPerPair', 'intro'].forEach(k => { if (k in main.segments[0]) main[k] = main.segments[0][k]; });
+      }
+      checkIn = { answers: unanswered(opts.checkIn) ? null : opts.checkIn, decision: d };
+      ctx.notes.unshift(d.line);
+    }
     const used = new Set(main.used);
     const core = coreBlock(ctx, b.minCore, used);
     core.items.forEach(i => used.add(i.name));
@@ -633,7 +741,7 @@
         total: sel.time, equipment: equipLabel(sel.equipment), machines: (sel.machines || []).slice(),
         showsMachines: sel.equipment in DEFAULT_MACHINES
       },
-      notes: ctx.notes, blocks: b, warmup, main, cooldown: { stretch, core },
+      notes: ctx.notes, checkIn, blocks: b, warmup, main, cooldown: { stretch, core },
       effort: sel.focus === 'cardio' ? TIMING.cardio.effort[type] : effortFor(sel, type),
       safety: SAFETY_LINE
     };
@@ -777,6 +885,7 @@
     weeklyCount, lastTrained, focusCount,
     validateSelections, validateGoal, validateLogRow, serializeLog, parseLog,
     allowedExercises, buildWorkout, workoutText, audit, swapExercise, wholeBodyLift, canPair, loadRank,
+    ENERGY, AREAS, SORENESS, FOCUS_AREAS, validateCheckIn, checkInDecision,
     equipLabel, focusLabel, typeLabel
   };
 })(typeof window !== 'undefined' ? window : this);
