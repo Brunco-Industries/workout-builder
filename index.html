@@ -105,6 +105,14 @@
   .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-ink);padding:10px 14px;border-radius:10px;font-size:.9rem;opacity:0;visibility:hidden;pointer-events:none;z-index:9} /* no transition: shown and hidden are plain states, the same in every browser */
   .toast.show{opacity:1;visibility:visible}
   .footer{color:var(--muted);font-size:.8rem;margin-top:20px}
+  /* perform: one step at a time */
+  .perf .big{font-size:1.5rem;font-weight:700;margin:4px 0 6px;line-height:1.2}
+  .perf .timer{font-size:3.2rem;font-weight:700;text-align:center;letter-spacing:.04em;margin:10px 0;font-variant-numeric:tabular-nums}
+  .perf .timer.over{color:var(--accent)}
+  .perf .ctl{display:grid;gap:8px;margin-top:10px}
+  .perf .ctl .btn{margin:0}
+  .perf .prog{height:6px;background:var(--chip);border-radius:3px;overflow:hidden;margin:4px 0 8px}
+  .perf .prog div{height:100%;background:var(--accent)}
 </style>
 </head>
 <body>
@@ -143,6 +151,8 @@
   <div id="offlineLog"><button type="button" class="btn ghost small" id="offlineBtn">Did a workout without the app? Log it</button><div id="offlineCard"></div></div>
   </div>
   </div>
+
+  <div id="performView" hidden></div>
 
   <div id="youView" hidden>
   <section class="card backup" id="backup">
@@ -200,6 +210,11 @@
     const r = d.result;
     if (r && typeof r === 'object' && r.version === E.APP_VERSION && r.check && r.check.ok && r.main && Array.isArray(r.main.segments)) {
       try { if (E.audit(r, LIB).length === 0) p.result = r; } catch (e) { /* an unreadable stored build is simply rebuilt */ }
+    }
+    // A workout in progress (story 4): the step reached, what he entered so far, and his unit; kept only with the stored workout it belongs to.
+    const q = d.perform;
+    if (p.result && q && typeof q === 'object' && Number.isInteger(q.i) && q.i >= 0 && q.performed && typeof q.performed === 'object') {
+      p.perform = { i: q.i, performed: q.performed, unit: E.UNITS.includes(q.unit) ? q.unit : 'kg' };
     }
     return p;
   }
@@ -438,10 +453,12 @@
       '<section class="block"><h4>Cool-down <span class="min">' + b.cooldown + ' min</span></h4>' + list(w.cooldown.stretch) +
         '<div class="core"><h5>Core <span class="min">' + w.cooldown.core.minutes + ' min</span></h5>' + list(w.cooldown.core.items) + '<p class="small" style="margin-top:4px">' + esc(w.cooldown.core.tail) + '</p></div></section>' +
       '<p class="safety">' + esc(w.safety) + '</p>' +
+      (S.stale ? '' : '<p><button type="button" class="btn" id="startBtn">' + (ST.pending && ST.pending.perform ? 'Resume the workout (step ' + (ST.pending.perform.i + 1) + ')' : 'Start the workout') + '</button><span class="small">One exercise at a time, with the rests and intervals timed. What you enter is kept with the entry; nothing is assumed.</span></p>') +
       (S.stale ? '' : '<p><button type="button" class="btn ghost small" id="anotherBtn">Build another</button> <span class="small">Different exercises for the same choices: the rotation moves on by the ' + w.main.items.length + ' used here, and only the workout on screen can be logged.</span></p>') +
       '<div class="meta"><div>Last trained ' + esc(w.header.focus) + ': <b>' + (lt ? esc(E.longDate(lt)) : 'no record yet') + '</b></div>' +
       '<div>This week: <b>' + count + (ST.goal !== null ? ' of ' + ST.goal : '') + '</b> workouts' + (ST.goal === null ? ' logged · no goal set yet' : '') + '</div></div></div>';
     if ($('dismissBtn')) $('dismissBtn').onclick = () => { ST.pending = null; S.offered = false; S.result = null; saveState(); renderResult(); renderLog(); toast('Dismissed. Nothing was logged.'); };
+    if ($('startBtn')) $('startBtn').onclick = startPerform;
     if ($('anotherBtn')) $('anotherBtn').onclick = () => { // decision 19: the rotation moves on by the exercises the build on screen used
       if (S.stale || !S.result) return;
       const used = S.result.main.items.length;
@@ -462,6 +479,121 @@
       S.result = r; if (ST.pending) ST.pending.result = r; saveState(); renderResult();
       toast('Swapped in ' + r.swaps[r.swaps.length - 1].to + '.');
     });
+  }
+
+  /* ---------- story 4, PERFORM: one step at a time; the timers run the rests and intervals; what he enters is his ---------- */
+  const T = { id: null, endsAt: 0, remaining: 0, paused: false };
+  let AC = null, wakeLock = null;
+  function initAudio() { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } }
+  function beep(n) {
+    if (!AC) return;
+    try {
+      const t0 = AC.currentTime;
+      for (let k = 0; k < (n || 2); k++) {
+        const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = 880; o.connect(g); g.connect(AC.destination);
+        g.gain.setValueAtTime(0.0001, t0 + k * 0.25); g.gain.exponentialRampToValueAtTime(0.3, t0 + k * 0.25 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + k * 0.25 + 0.18);
+        o.start(t0 + k * 0.25); o.stop(t0 + k * 0.25 + 0.2);
+      }
+    } catch (e) { /* no sound: the screen still advances */ }
+  }
+  const vibrate = () => { try { if (navigator.vibrate) navigator.vibrate([150, 80, 150]); } catch (e) { /* not on this device */ } };
+  async function keepAwake() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { wakeLock = null; } }
+  function releaseWake() { try { if (wakeLock) wakeLock.release(); } catch (e) { /* already released */ } wakeLock = null; }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.perf) { keepAwake(); tick(); } });
+  const mmss = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  function startTimer(seconds) { clearInterval(T.id); T.paused = false; T.remaining = seconds; T.endsAt = Date.now() + seconds * 1000; T.id = setInterval(tick, 250); }
+  function stopTimer() { clearInterval(T.id); T.id = null; T.remaining = 0; T.paused = false; }
+  function tick() {
+    if (!S.perf || T.paused || !T.id) return;
+    const left = Math.max(0, Math.ceil((T.endsAt - Date.now()) / 1000));
+    if (left !== T.remaining) { T.remaining = left; const box = $('timerBox'); if (box) box.textContent = mmss(left); }
+    if (left === 0) { clearInterval(T.id); T.id = null; beep(2); vibrate(); timerEnded(); }
+  }
+  function timerEnded() {
+    const P = S.perf, st = P.steps[P.i];
+    if (st.kind === 'work' && st.exercise) { const p = perfOf(st.exercise); p.sets = (p.sets || 0) + 1; } // a timed station or interval he let run counts as done
+    gotoStep(P.i + 1);
+  }
+  const perfOf = name => { const P = S.perf; if (!P.performed[name]) P.performed[name] = {}; return P.performed[name]; };
+  function persistPerform() { if (ST.pending && S.perf) { ST.pending.perform = { i: S.perf.i, performed: S.perf.performed, unit: S.perf.unit }; saveState(true); } }
+  function showPerform(on) {
+    $('performView').hidden = !on; $('mainView').hidden = on || S.you; $('youView').hidden = on || !S.you; $('youBtn').hidden = on;
+    document.querySelector('.head h1').textContent = on ? 'Workout' : 'Workout builder';
+    window.scrollTo(0, 0);
+  }
+  function startPerform() {
+    if (!S.result || S.stale || !S.result.check.ok) return;
+    initAudio(); keepAwake();
+    const resume = ST.pending && ST.pending.perform;
+    S.perf = { steps: E.performSteps(S.result, LIB), i: resume ? resume.i : 0, performed: resume ? resume.performed : {}, unit: resume && resume.unit ? resume.unit : 'kg' };
+    if (S.perf.i >= S.perf.steps.length) S.perf.i = 0;
+    showPerform(true);
+    gotoStep(S.perf.i, true);
+  }
+  function gotoStep(i, keepTimer) {
+    const P = S.perf;
+    if (i < 0) i = 0;
+    while (i < P.steps.length) { // a skipped exercise's later sets, stations and rests are passed over
+      const st = P.steps[i], ex = st.exercise || st.after;
+      if (ex && P.performed[ex] && P.performed[ex].skipped && st.kind !== 'done') { i++; continue; }
+      break;
+    }
+    if (i >= P.steps.length) i = P.steps.length - 1;
+    const st = P.steps[i];
+    if (st.kind === 'done') { finishPerform('Workout complete. Log it below.'); return; }
+    if (!(keepTimer && P.i === i && T.id)) { if (st.seconds) startTimer(st.seconds); else stopTimer(); }
+    P.i = i;
+    persistPerform();
+    renderPerform();
+  }
+  function finishPerform(msg) {
+    const P = S.perf; if (!P) return;
+    stopTimer(); releaseWake();
+    S.performed = P.performed; S.perf = null;
+    if (ST.pending) { delete ST.pending.perform; saveState(true); }
+    showPerform(false);
+    renderResult(); renderLog();
+    const r = $('logArea'); if (r.scrollIntoView) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast(msg);
+  }
+  function renderPerform() {
+    const P = S.perf, st = P.steps[P.i], n = P.steps.length, v = $('performView');
+    const perf = st.exercise ? (P.performed[st.exercise] || {}) : {};
+    const lt = st.exercise ? E.lastTime(ST.sessions, st.exercise, { before: S.result.date }) : null;
+    const val = x => x === undefined || x === null ? '' : x;
+    let b = '<div class="prog"><div style="width:' + Math.round(100 * P.i / Math.max(1, n - 1)) + '%"></div></div>';
+    b += '<p class="sub">' + esc(st.block) + ' · step ' + (P.i + 1) + ' of ' + n + '</p><p class="big">' + esc(st.name) + '</p>';
+    if (st.kind === 'set') b += '<p>Set ' + st.set + ' of ' + st.ofSets + ' · ' + esc(st.dose) + (st.perSide ? ' per side' : '') + '</p>' + (st.effort ? '<p class="hint">' + esc(st.effort) + '</p>' : '');
+    else if (st.kind === 'work' && st.round) b += '<p>Round ' + st.round + ' of ' + st.ofRounds + ' · station ' + st.station + ' of ' + st.ofStations + (st.perSide ? ' · switch sides halfway' : '') + '</p>' + (st.effort ? '<p class="hint">' + esc(st.effort) + '</p>' : '');
+    else if (st.kind === 'rest') b += '<p>' + esc(st.text || (P.steps[P.i + 1] ? 'then ' + P.steps[P.i + 1].name : '')) + '</p>';
+    else if (st.text) b += '<p>' + esc(st.text) + '</p>';
+    if (st.cue) b += '<p class="hint">' + esc(st.cue) + '</p>';
+    if (lt) b += '<p class="hint">Last time, ' + esc(E.longDate(lt.date)) + ': ' + esc(lt.text) + '</p>';
+    if (perf.sets) b += '<p class="hint">Done so far: ' + perf.sets + ' set' + (perf.sets === 1 ? '' : 's') + (val(perf.reps) !== '' ? ' × ' + perf.reps : '') + (val(perf.load) !== '' ? ' at ' + perf.load + ' ' + perf.unit : '') + '</p>';
+    if (st.seconds) b += '<div class="timer' + (T.remaining === 0 ? ' over' : '') + '" id="timerBox">' + mmss(T.remaining) + '</div>';
+    if (st.kind === 'set') b += '<div class="field"><label for="pReps" class="lbl">Reps done</label><input id="pReps" type="number" inputmode="numeric" min="0" placeholder="optional" value="' + esc(val(perf.reps)) + '"></div>' +
+      '<div class="field"><label for="pLoad" class="lbl">Load</label><input id="pLoad" type="number" inputmode="decimal" min="0" step="0.5" placeholder="optional" value="' + esc(val(perf.load)) + '"><button type="button" class="chip" id="pUnit" aria-label="Unit">' + esc(P.unit) + '</button></div>';
+    if (st.exercise && (st.kind === 'set' || st.kind === 'work')) b += '<div class="row"><span class="lbl">How was it? (optional)</span><div class="chips" id="pFeel"></div></div>';
+    b += '<div class="ctl">';
+    if (st.kind === 'set') b += '<button type="button" class="btn" id="pDone">Done set</button>';
+    if (st.seconds) b += '<button type="button" class="btn ghost" id="pPause">' + (T.paused ? 'Resume' : 'Pause') + '</button><button type="button" class="btn ghost" id="pNext">' + (st.kind === 'work' ? 'Done early' : 'Skip this') + '</button>';
+    if (st.exercise && (st.kind === 'set' || st.kind === 'work' || st.kind === 'rampup')) b += '<button type="button" class="btn ghost" id="pSkipEx">Skip this exercise</button>';
+    b += '<div class="logbar" style="grid-template-columns:1fr 1fr"><button type="button" id="pBack"' + (P.i === 0 ? ' disabled' : '') + '>Back</button><button type="button" id="pStop">Stop and log</button></div></div>';
+    v.innerHTML = '<div class="card perf">' + b + '</div>';
+    const readInputs = () => { const p = perfOf(st.exercise); const r = $('pReps') ? $('pReps').value.trim() : '', l = $('pLoad') ? $('pLoad').value.trim() : '';
+      if (r !== '' && /^\d+$/.test(r)) p.reps = Number(r); if (l !== '' && /^\d+(\.\d+)?$/.test(l)) { p.load = Number(l); p.unit = P.unit; } };
+    if ($('pDone')) $('pDone').onclick = () => { readInputs(); const p = perfOf(st.exercise); p.sets = (p.sets || 0) + 1; gotoStep(P.i + 1); };
+    if ($('pUnit')) $('pUnit').onclick = () => { P.unit = P.unit === 'kg' ? 'lb' : 'kg'; $('pUnit').textContent = P.unit; persistPerform(); };
+    if ($('pFeel')) chipRow('pFeel', E.FEELS.map(f => [f.key, f.label]), k => perf.feel === k, k => { if (st.kind === 'set') readInputs(); const p = perfOf(st.exercise); p.feel = p.feel === k ? undefined : k; persistPerform(); renderPerform(); }); // typed reps and load survive the re-render
+    if ($('pPause')) $('pPause').onclick = () => {
+      if (st.kind === 'set') readInputs();
+      if (T.paused) { T.paused = false; T.endsAt = Date.now() + T.remaining * 1000; T.id = setInterval(tick, 250); } else { T.paused = true; clearInterval(T.id); T.id = null; }
+      renderPerform();
+    };
+    if ($('pNext')) $('pNext').onclick = () => { if (st.kind === 'work' && st.exercise) { const p = perfOf(st.exercise); p.sets = (p.sets || 0) + 1; } gotoStep(P.i + 1); };
+    if ($('pSkipEx')) $('pSkipEx').onclick = () => { const p = perfOf(st.exercise); p.skipped = true; gotoStep(P.i + 1); };
+    $('pBack').onclick = () => gotoStep(P.i - 1);
+    $('pStop').onclick = () => { if ($('pReps')) readInputs(); finishPerform('Stopped. Log it below: Shortened if you did less than built.'); };
   }
 
   /* ---------- story 3: log it, see the row, undo ---------- */

@@ -220,6 +220,18 @@
     const w2 = E.buildWorkout(lib, sel(45, 'full-gym', 'lower', 'strength'), log, TODAY, { sessions: sess, startOffset: 4 });
     return { actual: 'record → ' + withRec + '; no record → ' + noRec + ' (expected ' + expectNoRec + '); build ' + w.rotationStart + ', with offset 4 → ' + w2.rotationStart, pass: withRec === 106 && noRec === expectNoRec && w.rotationStart === 106 && w2.rotationStart === 110 };
   });
+  await check('U27', 'D1 PERFORM steps: every warm-up and cool-down item is a timed step of its minutes; every set of every pair is a step followed by its rest; a ramp-up step before each barbell lift; a circuit gives stations × rounds work steps with 15 s change-overs and 60 s rests between rounds; cardio intervals follow §8; the last step is "done"', 'pairs: sets = Σ sets, rests = sets, ramp-ups = barbell lifts, warm-up seconds = minutes × 60; circuit: work = S × N, change = (S−1) × N, rests = N−1; cardio power: work = easy = k; last step done', () => {
+    const w = E.buildWorkout(lib, sel(60, 'full-gym', 'lower', 'strength'), [], TODAY), st = E.performSteps(w, lib);
+    const sets = w.main.items.reduce((a, i) => a + (i.sets || 0), 0), bb = w.main.items.filter(i => /^1 min ramp-up/.test(i.text)).length;
+    const n = k => st.filter(s => s.kind === k).length;
+    const warmSec = st.filter(s => s.block === 'Warm-up').reduce((a, s) => a + s.seconds, 0);
+    const c = E.buildWorkout(lib, sel(30, 'bodyweight-only', 'core', 'endurance'), [], TODAY), cs = E.performSteps(c, lib), seg = c.main.segments[0];
+    const cn = k => cs.filter(s => s.kind === k && /^Main/.test(s.block)).length;
+    const p = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'power', E.MACHINES.slice()), [], TODAY), ps = E.performSteps(p, lib), kInt = Math.floor(p.main.minutesUsed * 60 / 120);
+    const pw = ps.filter(s => s.kind === 'work' && /^Main/.test(s.block)).length, pe = ps.filter(s => s.kind === 'easy' && /^Main/.test(s.block) && /interval/.test(s.text)).length;
+    return { actual: 'strength: ' + st.length + ' steps, set ' + n('set') + ' of ' + sets + ', rest ' + st.filter(s => s.kind === 'rest' && /^Main/.test(s.block)).length + ', ramp-up ' + n('rampup') + ' of ' + bb + ', warm-up ' + warmSec + ' s of ' + w.blocks.warmup * 60 + '; circuit ' + seg.stations + '×' + seg.rounds + ': work ' + cn('work') + ', change ' + cn('change') + ', rest ' + cn('rest') + '; cardio power: work ' + pw + ', easy ' + pe + ' of ' + kInt + '; last ' + st[st.length - 1].kind,
+      pass: n('set') === sets && st.filter(s => s.kind === 'rest' && /^Main/.test(s.block)).length === sets && n('rampup') === bb && warmSec === w.blocks.warmup * 60 && cn('work') === seg.stations * seg.rounds && cn('change') === (seg.stations - 1) * seg.rounds && cn('rest') === seg.rounds - 1 && pw === kInt && pe === kInt && st[st.length - 1].kind === 'done' && cs[cs.length - 1].kind === 'done' };
+  });
   await check('U13', 'Full gym ticks gate the sled and the stair climber (Cardio · Strength · 30)', 'treadmill only → neither offered; sled + stair climber ticked → both offered', () => {
     const offered = m => { const w = E.buildWorkout(lib, sel(30, 'full-gym', 'cardio', 'strength', m), [], TODAY); return [w.main.items[0].name].concat(w.main.alternatives); };
     const a = offered(['treadmill']), b = offered(['treadmill', 'sled', 'stairclimber']);

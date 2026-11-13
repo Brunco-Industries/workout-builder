@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  const APP_VERSION = '0.7.0'; // D2 RECORD: the session record (validation, CSV, last time, bests) and the rotation offset it enables (decision 5)
+  const APP_VERSION = '0.7.1'; // D1 PERFORM: the workout as steps with the §8 timers; the screen runs them one at a time
   const SPEC_VERSION = '1.6';
 
   /* ---------- allowed values (workout-rules.md §1) ---------- */
@@ -930,6 +930,68 @@
     return w;
   }
 
+  /* ---------- PERFORM (stories.md story 4): the workout as steps, one at a time, with the timers of §8 ----------
+     A set step waits for him; rests, change-overs, circuit stations, cardio intervals, the ramp-up minute, the warm-up and cool-down items
+     are timed. Every main exercise is reachable in order; what he does is recorded by the screen, never assumed here. */
+  const secondsOf = txt => { const m = /^(\d+)\s*s$/.exec(txt || ''); return m ? Number(m[1]) : 0; };
+  const doseOf = item => { const t = String(item.text || '').replace(/^1 min ramp-up, then /, ''); const m = /^\d+ × (.+?)(?: · rest .*)?$/.exec(t); return m ? m[1].replace(/ per side$/, '') : t; };
+  function performSteps(w, library) {
+    const steps = [], c = TIMING.endurance, cd = TIMING.cardio, cc = TIMING.coolDownCore;
+    const cueOf = name => { const r = findRow(library, name); return r ? r.cue : ''; };
+    const push = s => { s.index = steps.length; steps.push(s); };
+    (w.warmup || []).forEach(i => push({ kind: 'timed', block: 'Warm-up', name: i.name, seconds: i.minutes * 60, text: i.text, cue: cueOf(i.name) }));
+    const segs = w.main.segments || [w.main];
+    segs.forEach(s => {
+      const label = 'Main block' + (segs.length > 1 ? ' · ' + typeLabel(s.type) : '');
+      if (s.kind === 'pairs') {
+        const groups = {}, order = [];
+        s.items.forEach(i => { const m = /^([A-Z])[12]$/.exec(i.tag), g = m ? m[1] : i.tag; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(i); });
+        order.forEach(g => {
+          const its = groups[g], rounds = Math.max.apply(null, its.map(i => i.sets || 0));
+          for (let r = 1; r <= rounds; r++) its.forEach(i => {
+            if (r > (i.sets || 0)) return;
+            const rest = secondsOf(i.rest);
+            if (r === 1 && /^1 min ramp-up/.test(i.text)) push({ kind: 'rampup', block: label, name: i.name, seconds: 60, text: 'Ramp-up: light sets, building to the working weight', exercise: i.name, cue: cueOf(i.name) });
+            push({ kind: 'set', block: label, name: i.name, tag: i.tag, set: r, ofSets: i.sets, dose: doseOf(i), perSide: / per side/.test(i.text), restSeconds: rest, exercise: i.name, cue: cueOf(i.name), effort: s.effort || '' });
+            if (rest) push({ kind: 'rest', block: label, name: 'Rest', seconds: rest, after: i.name });
+          });
+        });
+      } else if (s.kind === 'circuit') {
+        for (let n = 1; n <= s.rounds; n++) {
+          s.items.forEach((i, k) => {
+            push({ kind: 'work', block: label, name: i.name, seconds: c.stationSeconds, round: n, ofRounds: s.rounds, station: k + 1, ofStations: s.items.length, perSide: /switch sides/.test(i.text), exercise: i.name, cue: cueOf(i.name), effort: s.effort || '' });
+            if (k < s.items.length - 1) push({ kind: 'change', block: label, name: 'Change over', seconds: c.changeSeconds, text: 'next: ' + s.items[k + 1].name });
+          });
+          if (n < s.rounds) push({ kind: 'rest', block: label, name: 'Rest', seconds: c.roundRestSeconds, text: 'then round ' + (n + 1) + ' of ' + s.rounds });
+        }
+      } else if (s.kind === 'cardio') {
+        const i = s.items[0];
+        if (s.type === 'endurance') push({ kind: 'work', block: label, name: i.name, seconds: s.minutesUsed * 60, text: 'steady effort', exercise: i.name, cue: cueOf(i.name) });
+        else {
+          const on = s.type === 'strength' ? cd.strengthHardMin * 60 : cd.powerOnSec, off = s.type === 'strength' ? cd.strengthEasyMin * 60 : cd.powerOffSec;
+          const k = Math.floor(s.minutesUsed * 60 / (on + off));
+          for (let r = 1; r <= k; r++) {
+            push({ kind: 'work', block: label, name: i.name, seconds: on, text: (s.type === 'strength' ? 'hard' : 'all-out') + ' · interval ' + r + ' of ' + k, exercise: i.name, cue: cueOf(i.name) });
+            push({ kind: 'easy', block: label, name: 'Easy', seconds: off, text: 'easy · interval ' + r + ' of ' + k });
+          }
+        }
+      }
+      if (s.tail) {
+        const easy = /Easy movement · (\d+) min/.exec(s.tail), easyMin = easy ? Number(easy[1]) : 0;
+        const spare = (s.remainder || 0) - easyMin;
+        if (spare > 0) push({ kind: 'easy', block: label, name: /Easy finish/.test(s.tail) ? 'Easy finish' : 'Set-up and change-over', seconds: spare * 60, text: '' });
+        if (easyMin > 0) push({ kind: 'easy', block: label, name: 'Easy movement', seconds: easyMin * 60, text: 'walk, cycle easy or stretch (from the check-in)' });
+      }
+    });
+    (w.cooldown.stretch || []).forEach(i => push({ kind: 'timed', block: 'Cool-down', name: i.name, seconds: i.minutes * 60, text: i.text, cue: cueOf(i.name) }));
+    (w.cooldown.core.items || []).forEach((i, k, arr) => {
+      push({ kind: 'work', block: 'Cool-down · core', name: i.name, seconds: cc.stationSeconds, text: i.text, cue: cueOf(i.name) });
+      if (k < arr.length - 1) push({ kind: 'change', block: 'Cool-down · core', name: 'Change over', seconds: cc.changeSeconds, text: 'next: ' + arr[k + 1].name });
+    });
+    push({ kind: 'done', block: 'Done', name: 'Workout complete' });
+    return steps;
+  }
+
   /* ---------- audit: the checks a reviewer runs on any generated workout ---------- */
   const WEIGHT_RE = /\b\d+(\.\d+)?\s?(kg|kgs|kilo|kilos|lb|lbs|pound|pounds)\b/i;
   const PUSH_THROUGH_RE = /push(ing)? through/i;
@@ -1003,6 +1065,7 @@
     allowedExercises, buildWorkout, workoutText, audit, swapExercise, wholeBodyLift, canPair, loadRank,
     ENERGY, AREAS, SORENESS, FOCUS_AREAS, validateCheckIn, checkInDecision,
     SESSION_FIELDS, FEELS, UNITS, validateSessionRow, serializeSessions, parseSessions, sessionRowsFromWorkout, performedText, feelLabel, hasDetail, lastTime, bestPerExercise, bestText, rotationStart,
+    performSteps,
     equipLabel, focusLabel, typeLabel
   };
 })(typeof window !== 'undefined' ? window : this);
